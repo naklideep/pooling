@@ -9,11 +9,7 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-
-  String name = "";
-  String enrollment = "";
-  String email = "";
-  String contact = "";
+  Map<String, dynamic>? userData;
   bool isLoading = true;
 
   @override
@@ -32,10 +28,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
       if (doc.exists) {
         setState(() {
-          name = doc["name"];
-          enrollment = doc["enrollment"];
-          email = doc["email"];
-          contact = doc["contact"];
+          userData = doc.data();
           isLoading = false;
         });
       }
@@ -60,16 +53,17 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ),
             SizedBox(height: 30),
-            Text("Name: $name",
-                style:
-                TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text("Name: ${userData?["name"] ?? ""}",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             SizedBox(height: 12),
-            Text("Enrollment: $enrollment",
+            Text("Enrollment: ${userData?["enrollment"] ?? ""}",
                 style: TextStyle(fontSize: 16)),
             SizedBox(height: 12),
-            Text("Email: $email", style: TextStyle(fontSize: 16)),
+            Text("Email: ${userData?["email"] ?? ""}",
+                style: TextStyle(fontSize: 16)),
             SizedBox(height: 12),
-            Text("Contact: $contact", style: TextStyle(fontSize: 16)),
+            Text("Joined: ${userData?["createdAt"]?.toDate().toString().split(' ')[0] ?? ""}",
+                style: TextStyle(fontSize: 16, fontStyle: FontStyle.italic)),
           ],
         ),
       ),
