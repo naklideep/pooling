@@ -32,9 +32,14 @@ class _PostRidePageState extends State<PostRidePage> {
         'to': _toController.text.trim(),
         'date': _dateController.text.trim(),
         'time': _timeController.text.trim(),
-        'availableSeats': int.parse(_seatsController.text.trim()),
-        'createdBy': user?.uid,
+        'seats': int.parse(_seatsController.text.trim()),
+        'riderId': user?.uid,
+        'status': 'pending',
+        'acceptedBy': '',
+        'acceptedByName': '',
         'timestamp': FieldValue.serverTimestamp(),
+        'acceptedAt': null,
+        'completedAt': null,
       });
 
       ScaffoldMessenger.of(context).showSnackBar(

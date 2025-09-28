@@ -14,23 +14,49 @@ class _RegistrationPageState extends State<RegistrationPage> {
   final TextEditingController _passwordController = TextEditingController();
 
   bool _obscurePassword = true;
+  bool _isLoading = false;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   void _register() async {
-    if (_nameController.text.trim().isEmpty ||
-        _enrollmentController.text.trim().isEmpty ||
-        _emailController.text.trim().isEmpty ||
-        _passwordController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("All fields are required")),
-      );
+    String name = _nameController.text.trim();
+    String enrollment = _enrollmentController.text.trim();
+    String email = _emailController.text.trim();
+    String password = _passwordController.text.trim();
+
+    // 🔹 Check empty fields
+    if (name.isEmpty || enrollment.isEmpty || email.isEmpty || password.isEmpty) {
+      _showSnackBar("All fields are required");
       return;
     }
 
+    // 🔹 Name validation (only alphabets + spaces, min 2 chars)
+    if (name.length < 2) {
+      _showSnackBar("Name must be at least 2 characters long");
+      return;
+    }
+    if (!RegExp(r'^[A-Za-z ]+$').hasMatch(name)) {
+      _showSnackBar("Name can only contain letters and spaces");
+      return;
+    }
+
+    // 🔹 Enrollment validation (only digits)
+    if (!RegExp(r'^[0-9]+$').hasMatch(enrollment)) {
+      _showSnackBar("Enrollment must contain only numbers");
+      return;
+    }
+
+    // 🔹 Password check
+    if (password.length < 6) {
+      _showSnackBar("Password must be at least 6 characters long");
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
     try {
       UserCredential user = await _auth.createUserWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+        email: email,
+        password: password,
       );
 
       if (user.user != null) {
@@ -42,25 +68,37 @@ class _RegistrationPageState extends State<RegistrationPage> {
             .collection("users")
             .doc(user.user!.uid)
             .set({
-          "name": _nameController.text.trim(),
-          "enrollment": _enrollmentController.text.trim(),
-          "email": _emailController.text.trim(),
+          "name": name,
+          "enrollment": enrollment,
+          "email": email,
           "createdAt": Timestamp.now(),
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Verification email sent! Please verify before login."),
-          ),
-        );
-
+        _showSnackBar("Verification email sent! Please verify before login.");
         Navigator.pop(context);
       }
+    } on FirebaseAuthException catch (e) {
+      _showSnackBar(e.message ?? "Registration failed");
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
+      _showSnackBar("Something went wrong. Try again.");
+    } finally {
+      setState(() => _isLoading = false);
     }
+  }
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _enrollmentController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 
   @override
@@ -80,11 +118,13 @@ class _RegistrationPageState extends State<RegistrationPage> {
               TextField(
                 controller: _enrollmentController,
                 decoration: InputDecoration(labelText: "Enrollment"),
+                keyboardType: TextInputType.number,
               ),
               SizedBox(height: 16),
               TextField(
                 controller: _emailController,
                 decoration: InputDecoration(labelText: "Email"),
+                keyboardType: TextInputType.emailAddress,
               ),
               SizedBox(height: 16),
               TextField(
@@ -94,7 +134,10 @@ class _RegistrationPageState extends State<RegistrationPage> {
                   labelText: "Password",
                   suffixIcon: IconButton(
                     icon: Icon(
-                        _obscurePassword ? Icons.visibility : Icons.visibility_off),
+                      _obscurePassword
+                          ? Icons.visibility
+                          : Icons.visibility_off,
+                    ),
                     onPressed: () {
                       setState(() {
                         _obscurePassword = !_obscurePassword;
@@ -104,7 +147,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
                 ),
               ),
               SizedBox(height: 24),
-              ElevatedButton(
+              _isLoading
+                  ? CircularProgressIndicator()
+                  : ElevatedButton(
                 onPressed: _register,
                 child: Text("Register", style: TextStyle(fontSize: 18)),
                 style: ElevatedButton.styleFrom(
