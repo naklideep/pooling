@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'profile_page.dart';
 import 'login_page.dart';
+import 'post_ride.dart';
 import 'chat_page.dart';
 import 'post_ride_widget.dart';
 import 'find_ride_widget.dart';
@@ -123,7 +124,7 @@ class _DashboardPageState extends State<DashboardPage> {
         ),
         body: TabBarView(
           children: [
-            PostRideWidget(userId: user.uid),
+            PostRidePage(),
             FindRideWidget(userId: user.uid),
           ],
         ),

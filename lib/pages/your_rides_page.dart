@@ -1,4 +1,3 @@
-// your_rides_page.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'chat_page.dart';
@@ -10,7 +9,7 @@ class YourRidesPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 2, // Posted & Accepted
+      length: 2,
       child: Scaffold(
         appBar: AppBar(
           title: Text("Your Rides"),
@@ -31,12 +30,10 @@ class YourRidesPage extends StatelessWidget {
                   .orderBy("timestamp", descending: true)
                   .snapshots(),
               builder: (context, snapshot) {
-                if (!snapshot.hasData)
-                  return Center(child: CircularProgressIndicator());
+                if (!snapshot.hasData) return Center(child: CircularProgressIndicator());
 
                 final rides = snapshot.data!.docs;
-                if (rides.isEmpty)
-                  return Center(child: Text("No posted rides yet."));
+                if (rides.isEmpty) return Center(child: Text("No posted rides yet."));
 
                 return ListView.builder(
                   itemCount: rides.length,
@@ -63,7 +60,6 @@ class YourRidesPage extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             if (status == "accepted")
-
                               IconButton(
                                 icon: Icon(Icons.chat, color: Colors.blue),
                                 tooltip: "Chat",
@@ -71,8 +67,7 @@ class YourRidesPage extends StatelessWidget {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (_) =>
-                                          ChatPage(rideId: rides[index].id),
+                                      builder: (_) => ChatPage(rideId: rides[index].id),
                                     ),
                                   );
                                 },
@@ -112,18 +107,17 @@ class YourRidesPage extends StatelessWidget {
                   .orderBy("acceptedAt", descending: true)
                   .snapshots(),
               builder: (context, snapshot) {
-                if (!snapshot.hasData)
-                  return Center(child: CircularProgressIndicator());
+                if (!snapshot.hasData) return Center(child: CircularProgressIndicator());
 
                 final rides = snapshot.data!.docs;
-                if (rides.isEmpty)
-                  return Center(child: Text("No accepted rides yet."));
+                if (rides.isEmpty) return Center(child: Text("No accepted rides yet."));
 
                 return ListView.builder(
                   itemCount: rides.length,
                   itemBuilder: (context, index) {
                     final rideData = rides[index].data() as Map<String, dynamic>? ?? {};
                     final status = rideData['status'] ?? 'pending';
+                    final postedByName = rideData['postedByName'] ?? 'Unknown';
 
                     return Card(
                       margin: EdgeInsets.all(10),
@@ -135,6 +129,7 @@ class YourRidesPage extends StatelessWidget {
                           children: [
                             Text("Seats: ${rideData['seats']}"),
                             Text("Status: $status"),
+                            Text("Posted by: $postedByName"), // Added postedBy
                           ],
                         ),
                         trailing: Row(
@@ -147,8 +142,7 @@ class YourRidesPage extends StatelessWidget {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) =>
-                                        ChatPage(rideId: rides[index].id),
+                                    builder: (_) => ChatPage(rideId: rides[index].id),
                                   ),
                                 );
                               },

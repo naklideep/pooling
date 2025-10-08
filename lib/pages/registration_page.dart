@@ -23,13 +23,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
     String email = _emailController.text.trim();
     String password = _passwordController.text.trim();
 
-    // 🔹 Check empty fields
     if (name.isEmpty || enrollment.isEmpty || email.isEmpty || password.isEmpty) {
       _showSnackBar("All fields are required");
       return;
     }
 
-    // 🔹 Name validation (only alphabets + spaces, min 2 chars)
     if (name.length < 2) {
       _showSnackBar("Name must be at least 2 characters long");
       return;
@@ -39,13 +37,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
       return;
     }
 
-    // 🔹 Enrollment validation (only digits)
     if (!RegExp(r'^[0-9]+$').hasMatch(enrollment)) {
       _showSnackBar("Enrollment must contain only numbers");
       return;
     }
 
-    // 🔹 Password check
     if (password.length < 6) {
       _showSnackBar("Password must be at least 6 characters long");
       return;
@@ -60,10 +56,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
       );
 
       if (user.user != null) {
-        // Send email verification
         await user.user!.sendEmailVerification();
 
-        // Store user in Firestore
+        // ✅ Save user details with isBanned = false
         await FirebaseFirestore.instance
             .collection("users")
             .doc(user.user!.uid)
@@ -72,6 +67,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
           "enrollment": enrollment,
           "email": email,
           "createdAt": Timestamp.now(),
+          "isBanned": false, // 👈 Added this field
         });
 
         _showSnackBar("Verification email sent! Please verify before login.");

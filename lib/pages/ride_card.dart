@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'chat_page.dart';
 
 class RideCard extends StatelessWidget {
   final Map<String, dynamic> rideData;
@@ -16,144 +14,79 @@ class RideCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool isOwner = rideData['riderId'] == currentUserId;
-    final String status = rideData['status'] ?? 'pending';
-    final bool isAccepted = status == 'accepted';
-    final bool isPending = status == 'pending';
-    final bool isCancelled = status == 'cancelled';
-    final bool isCompleted = status == 'completed';
-    final int seats = int.tryParse(rideData['seats'].toString()) ?? 0;
-    final String acceptedByName = rideData['acceptedByName'] ?? '';
+    bool isCancelled = rideData['status'] == 'cancelled';
+    bool isOwner = rideData['userId'] == currentUserId;
 
     return Card(
-      margin: EdgeInsets.all(10),
+      margin: EdgeInsets.all(8),
       child: Padding(
-        padding: EdgeInsets.all(8),
+        padding: const EdgeInsets.all(12.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ---------------- Ride Info ----------------
-            ListTile(
-              leading: Icon(
-                Icons.directions_car,
-                color: isAccepted
-                    ? Colors.green
-                    : (isPending ? Colors.blue : Colors.grey),
-              ),
-              title: Text("${rideData['from']} ➝ ${rideData['to']}"),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("Seats: $seats"),
-                  Text("Status: $status"),
-                  if (acceptedByName.isNotEmpty) Text("Accepted by: $acceptedByName"),
-                  if (rideData['timestamp'] != null)
-                    Text("Posted: ${(rideData['timestamp'] as Timestamp).toDate()}"),
-                  if (rideData['acceptedAt'] != null)
-                    Text("Accepted: ${(rideData['acceptedAt'] as Timestamp).toDate()}"),
-                  if (rideData['completedAt'] != null)
-                    Text("Completed: ${(rideData['completedAt'] as Timestamp).toDate()}"),
-                ],
-              ),
+            Text(
+              rideData['title'] ?? 'Ride',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-
+            SizedBox(height: 4),
+            Text(rideData['description'] ?? ''),
             SizedBox(height: 8),
 
-            // ---------------- Buttons ----------------
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  // Accept & Chat (for passengers)
-                  if (!isOwner && isPending && !isCancelled)
-                    ElevatedButton(
-                      child: Text("Accept & Chat"),
-                      onPressed: () async {
-                        final user = FirebaseAuth.instance.currentUser!;
-                        final userDoc = await FirebaseFirestore.instance
-                            .collection("users")
-                            .doc(user.uid)
-                            .get();
-                        final userName = userDoc['name'] ?? 'Passenger';
-
-                        await FirebaseFirestore.instance
-                            .collection("rides")
-                            .doc(rideId)
-                            .update({
-                          'status': 'accepted',
-                          'acceptedBy': currentUserId,
-                          'acceptedByName': userName,
-                          'acceptedAt': FieldValue.serverTimestamp(),
-                        });
-
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => ChatPage(rideId: rideId)),
-                        );
-                      },
-                    ),
-
-                  SizedBox(width: 8),
-
-                  // Cancel Ride (for owner)
-                  if (isOwner && isPending && !isCancelled)
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                      child: Text("Cancel Ride"),
-                      onPressed: () async {
-                        await FirebaseFirestore.instance
-                            .collection("rides")
-                            .doc(rideId)
-                            .update({"status": "cancelled"});
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("Ride cancelled ❌")),
-                        );
-                      },
-                    ),
-
-                  SizedBox(width: 8),
-
-                  // End Ride (for owner)
-                  if (isOwner && isAccepted)
-                    ElevatedButton(
-                      style:
-                      ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-                      child: Text("End Ride"),
-                      onPressed: () async {
-                        await FirebaseFirestore.instance
-                            .collection("rides")
-                            .doc(rideId)
-                            .update({
-                          "status": "completed",
-                          "completedAt": FieldValue.serverTimestamp(),
-                        });
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("Ride completed ✅")),
-                        );
-                      },
-                    ),
-
-                  SizedBox(width: 8),
-
-                  // Chat (for accepted rides or owner)
-                  if ((isAccepted && !isOwner) || (isOwner && !isPending && !isCancelled))
-                    ElevatedButton(
-                      child: Text("Chat"),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => ChatPage(rideId: rideId)),
-                        );
-                      },
-                    ),
-                ],
+            // Cancel button (only visible to ride owner and if not already cancelled)
+            if (isOwner && !isCancelled)
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                ),
+                onPressed: () => _confirmCancel(context, rideId),
+                child: Text("Cancel Ride"),
               ),
-            ),
+
+            // Show cancelled status
+            if (isCancelled)
+              Text(
+                "Cancelled",
+                style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+              ),
           ],
         ),
       ),
     );
+  }
+
+  void _confirmCancel(BuildContext context, String rideId) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text("Cancel Ride"),
+        content: Text("Are you sure you want to cancel this ride?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text("No"),
+          ),
+          TextButton(
+            onPressed: () {
+              _cancelRide(rideId);
+              Navigator.of(ctx).pop();
+            },
+            child: Text("Yes"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _cancelRide(String rideId) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection("rides")
+          .doc(rideId)
+          .update({'status': 'cancelled'});
+
+      print("Ride cancelled successfully!");
+    } catch (e) {
+      print("Error cancelling ride: $e");
+    }
   }
 }

@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dashboard_page.dart';
 import 'registration_page.dart';
+import 'admin_dashboard_page.dart'; // 🆕 Admin page import
 
 class LoginPage extends StatefulWidget {
   @override
   _LoginPageState createState() => _LoginPageState();
 }
+
+// 🧩 Your admin email
+const String adminEmail = "chaudharideep1106@gmail.com";
 
 class _LoginPageState extends State<LoginPage> {
   final TextEditingController _emailController = TextEditingController();
@@ -18,6 +23,7 @@ class _LoginPageState extends State<LoginPage> {
 
   void _login() async {
     try {
+      // 🟦 Step 1: Try to sign in
       UserCredential user = await _auth.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
@@ -27,12 +33,42 @@ class _LoginPageState extends State<LoginPage> {
         if (!user.user!.emailVerified) {
           await _auth.signOut();
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Please verify your email before logging in.")),
+            const SnackBar(content: Text("Please verify your email before logging in.")),
           );
           return;
         }
 
-        Navigator.push(
+        final userEmail = user.user!.email;
+
+        // 🟩 Step 2: Check if admin
+        if (userEmail == adminEmail) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const AdminDashboardPage()),
+          );
+          return;
+        }
+
+        // 🟥 Step 3: Check if user is banned in Firestore
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.user!.uid)
+            .get();
+
+        if (userDoc.exists && (userDoc['isBanned'] == true)) {
+          await _auth.signOut(); // logout immediately
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("You are banned from the app."),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+
+          return;
+        }
+
+        // ✅ Step 4: Normal user — go to dashboard
+        Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => DashboardPage()),
         );
@@ -41,12 +77,12 @@ class _LoginPageState extends State<LoginPage> {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text("Login Failed"),
+          title: const Text("Login Failed"),
           content: Text(e.toString()),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text("OK"),
+              child: const Text("OK"),
             ),
           ],
         ),
@@ -58,11 +94,11 @@ class _LoginPageState extends State<LoginPage> {
     if (_emailController.text.isNotEmpty) {
       _auth.sendPasswordResetEmail(email: _emailController.text.trim());
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Password reset email sent")),
+        const SnackBar(content: Text("Password reset email sent")),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Enter your email first")),
+        const SnackBar(content: Text("Enter your email first")),
       );
     }
   }
@@ -79,35 +115,38 @@ class _LoginPageState extends State<LoginPage> {
     return Scaffold(
       body: SingleChildScrollView(
         child: Padding(
-          padding: EdgeInsets.all(24.0),
+          padding: const EdgeInsets.all(24.0),
           child: Column(
             children: [
-              SizedBox(height: 80),
-              Icon(Icons.directions_car, size: 80, color: Colors.blueAccent),
-              SizedBox(height: 20),
-              Text("Welcome to GharTak",
-                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
-              SizedBox(height: 40),
+              const SizedBox(height: 80),
+              const Icon(Icons.directions_car, size: 80, color: Colors.blueAccent),
+              const SizedBox(height: 20),
+              const Text(
+                "Welcome to GharTak",
+                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 40),
               TextField(
                 controller: _emailController,
                 decoration: InputDecoration(
                   labelText: "Email",
-                  prefixIcon: Icon(Icons.email),
+                  prefixIcon: const Icon(Icons.email),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               TextField(
                 controller: _passwordController,
                 obscureText: _obscurePassword,
                 decoration: InputDecoration(
                   labelText: "Password",
-                  prefixIcon: Icon(Icons.lock),
+                  prefixIcon: const Icon(Icons.lock),
                   suffixIcon: IconButton(
-                    icon: Icon(
-                        _obscurePassword ? Icons.visibility : Icons.visibility_off),
+                    icon: Icon(_obscurePassword
+                        ? Icons.visibility
+                        : Icons.visibility_off),
                     onPressed: () {
                       setState(() {
                         _obscurePassword = !_obscurePassword;
@@ -119,7 +158,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               Row(
                 children: [
                   Checkbox(
@@ -128,29 +167,29 @@ class _LoginPageState extends State<LoginPage> {
                       setState(() => _rememberMe = value!);
                     },
                   ),
-                  Text("Remember Me"),
-                  Spacer(),
+                  const Text("Remember Me"),
+                  const Spacer(),
                   TextButton(
                     onPressed: _forgotPassword,
-                    child: Text("Forgot Password?"),
+                    child: const Text("Forgot Password?"),
                   ),
                 ],
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: _login,
-                child: Text("Login", style: TextStyle(fontSize: 18)),
                 style: ElevatedButton.styleFrom(
-                  minimumSize: Size(double.infinity, 50),
+                  minimumSize: const Size(double.infinity, 50),
                 ),
+                child: const Text("Login", style: TextStyle(fontSize: 18)),
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               OutlinedButton(
                 onPressed: _createAccount,
-                child: Text("Create Account", style: TextStyle(fontSize: 16)),
                 style: OutlinedButton.styleFrom(
-                  minimumSize: Size(double.infinity, 50),
+                  minimumSize: const Size(double.infinity, 50),
                 ),
+                child: const Text("Create Account", style: TextStyle(fontSize: 16)),
               ),
             ],
           ),

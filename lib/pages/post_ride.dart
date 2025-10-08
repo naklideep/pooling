@@ -11,11 +11,11 @@ class PostRidePage extends StatefulWidget {
 
 class _PostRidePageState extends State<PostRidePage> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _fromController = TextEditingController();
-  final TextEditingController _toController = TextEditingController();
-  final TextEditingController _dateController = TextEditingController();
-  final TextEditingController _timeController = TextEditingController();
-  final TextEditingController _seatsController = TextEditingController();
+  final _fromController = TextEditingController();
+  final _toController = TextEditingController();
+  final _seatsController = TextEditingController();
+  final _dateController = TextEditingController();
+  final _timeController = TextEditingController();
 
   bool _isLoading = false;
 
@@ -26,42 +26,63 @@ class _PostRidePageState extends State<PostRidePage> {
 
     try {
       final user = FirebaseAuth.instance.currentUser;
+      if (user == null) throw Exception("User not logged in");
 
+      // ✅ Fetch username (from Firestore or fallback)
+      String userName = "Unknown";
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (userDoc.exists && userDoc.data()?['name'] != null) {
+        userName = userDoc['name'];
+      } else if (user.displayName != null && user.displayName!.isNotEmpty) {
+        userName = user.displayName!;
+      } else if (user.email != null && user.email!.contains('@')) {
+        userName = user.email!.split('@').first;
+      }
+
+      // ✅ Save ride data with all expected fields
       await FirebaseFirestore.instance.collection('rides').add({
         'from': _fromController.text.trim(),
         'to': _toController.text.trim(),
+        'seats': int.tryParse(_seatsController.text.trim()) ?? 1,
         'date': _dateController.text.trim(),
         'time': _timeController.text.trim(),
-        'seats': int.parse(_seatsController.text.trim()),
-        'riderId': user?.uid,
         'status': 'pending',
-        'acceptedBy': '',
-        'acceptedByName': '',
+        'riderId': user.uid,           // same naming as find_ride_widget
+        'postedByName': userName,      // rider name shown in ride feed
+        'acceptedBy': '',              // will be updated when accepted
+        'acceptedByName': '',          // will store acceptor name
+        'acceptedAt': null,            // timestamp when accepted
+        'completedAt': null,           // future use
         'timestamp': FieldValue.serverTimestamp(),
-        'acceptedAt': null,
-        'completedAt': null,
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Ride posted successfully ✅")),
+        SnackBar(content: Text("✅ Ride posted successfully by $userName")),
       );
 
-      Navigator.pop(context);
+      _formKey.currentState!.reset();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
+        SnackBar(content: Text("❌ Error posting ride: $e")),
       );
+    } finally {
+      setState(() => _isLoading = false);
     }
-
-    setState(() => _isLoading = false);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Post a Ride")),
+      appBar: AppBar(
+        title: const Text("Post a Ride"),
+        centerTitle: true,
+      ),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         child: Form(
           key: _formKey,
           child: ListView(
@@ -69,43 +90,37 @@ class _PostRidePageState extends State<PostRidePage> {
               TextFormField(
                 controller: _fromController,
                 decoration: const InputDecoration(labelText: "From"),
-                validator: (value) =>
-                value == null || value.isEmpty ? "Enter start location" : null,
+                validator: (v) => v!.isEmpty ? "Enter source" : null,
               ),
               TextFormField(
                 controller: _toController,
                 decoration: const InputDecoration(labelText: "To"),
-                validator: (value) =>
-                value == null || value.isEmpty ? "Enter destination" : null,
-              ),
-              TextFormField(
-                controller: _dateController,
-                decoration: const InputDecoration(labelText: "Date (DD/MM/YYYY)"),
-                validator: (value) =>
-                value == null || value.isEmpty ? "Enter date" : null,
-              ),
-              TextFormField(
-                controller: _timeController,
-                decoration: const InputDecoration(labelText: "Time (HH:MM)"),
-                validator: (value) =>
-                value == null || value.isEmpty ? "Enter time" : null,
+                validator: (v) => v!.isEmpty ? "Enter destination" : null,
               ),
               TextFormField(
                 controller: _seatsController,
-                keyboardType: TextInputType.number,
                 decoration: const InputDecoration(labelText: "Available Seats"),
-                validator: (value) {
-                  if (value == null || value.isEmpty) return "Enter seats";
-                  if (int.tryParse(value) == null) return "Enter a valid number";
-                  return null;
-                },
+                keyboardType: TextInputType.number,
+                validator: (v) => v!.isEmpty ? "Enter number of seats" : null,
               ),
-              const SizedBox(height: 20),
-              _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : ElevatedButton(
-                onPressed: _postRide,
-                child: const Text("Post Ride"),
+              TextFormField(
+                controller: _dateController,
+                decoration:
+                const InputDecoration(labelText: "Date (e.g. 2025-10-07)"),
+                validator: (v) => v!.isEmpty ? "Enter date" : null,
+              ),
+              TextFormField(
+                controller: _timeController,
+                decoration:
+                const InputDecoration(labelText: "Time (e.g. 10:00 AM)"),
+                validator: (v) => v!.isEmpty ? "Enter time" : null,
+              ),
+              const SizedBox(height: 25),
+              ElevatedButton(
+                onPressed: _isLoading ? null : _postRide,
+                child: _isLoading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text("Post Ride"),
               ),
             ],
           ),
