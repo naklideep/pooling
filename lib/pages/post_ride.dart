@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart'; // for formatting
 
 class PostRidePage extends StatefulWidget {
   const PostRidePage({super.key});
@@ -14,13 +15,44 @@ class _PostRidePageState extends State<PostRidePage> {
   final _fromController = TextEditingController();
   final _toController = TextEditingController();
   final _seatsController = TextEditingController();
-  final _dateController = TextEditingController();
-  final _timeController = TextEditingController();
 
+  DateTime? _selectedDateTime;
   bool _isLoading = false;
 
+  // 🔹 Pick Date and Time together
+  Future<void> _pickDateTime() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2030),
+    );
+    if (date == null) return;
+
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+    );
+    if (time == null) return;
+
+    final combined = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
+
+    setState(() => _selectedDateTime = combined);
+  }
+
   Future<void> _postRide() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate() || _selectedDateTime == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("⚠️ Please select a date & time")),
+      );
+      return;
+    }
 
     setState(() => _isLoading = true);
 
@@ -28,12 +60,9 @@ class _PostRidePageState extends State<PostRidePage> {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) throw Exception("User not logged in");
 
-      // ✅ Fetch username (from Firestore or fallback)
       String userName = "Unknown";
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
+      final userDoc =
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
 
       if (userDoc.exists && userDoc.data()?['name'] != null) {
         userName = userDoc['name'];
@@ -43,20 +72,18 @@ class _PostRidePageState extends State<PostRidePage> {
         userName = user.email!.split('@').first;
       }
 
-      // ✅ Save ride data with all expected fields
       await FirebaseFirestore.instance.collection('rides').add({
         'from': _fromController.text.trim(),
         'to': _toController.text.trim(),
         'seats': int.tryParse(_seatsController.text.trim()) ?? 1,
-        'date': _dateController.text.trim(),
-        'time': _timeController.text.trim(),
+        'dateTime': _selectedDateTime,
         'status': 'pending',
-        'riderId': user.uid,           // same naming as find_ride_widget
-        'postedByName': userName,      // rider name shown in ride feed
-        'acceptedBy': '',              // will be updated when accepted
-        'acceptedByName': '',          // will store acceptor name
-        'acceptedAt': null,            // timestamp when accepted
-        'completedAt': null,           // future use
+        'riderId': user.uid,
+        'postedByName': userName,
+        'acceptedBy': '',
+        'acceptedByName': '',
+        'acceptedAt': null,
+        'completedAt': null,
         'timestamp': FieldValue.serverTimestamp(),
       });
 
@@ -65,6 +92,7 @@ class _PostRidePageState extends State<PostRidePage> {
       );
 
       _formKey.currentState!.reset();
+      setState(() => _selectedDateTime = null);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("❌ Error posting ride: $e")),
@@ -76,6 +104,10 @@ class _PostRidePageState extends State<PostRidePage> {
 
   @override
   Widget build(BuildContext context) {
+    final dateTimeText = _selectedDateTime == null
+        ? "Pick Date & Time"
+        : DateFormat('yyyy-MM-dd hh:mm a').format(_selectedDateTime!);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Post a Ride"),
@@ -103,17 +135,11 @@ class _PostRidePageState extends State<PostRidePage> {
                 keyboardType: TextInputType.number,
                 validator: (v) => v!.isEmpty ? "Enter number of seats" : null,
               ),
-              TextFormField(
-                controller: _dateController,
-                decoration:
-                const InputDecoration(labelText: "Date (e.g. 2025-10-07)"),
-                validator: (v) => v!.isEmpty ? "Enter date" : null,
-              ),
-              TextFormField(
-                controller: _timeController,
-                decoration:
-                const InputDecoration(labelText: "Time (e.g. 10:00 AM)"),
-                validator: (v) => v!.isEmpty ? "Enter time" : null,
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.calendar_today),
+                label: Text(dateTimeText),
+                onPressed: _pickDateTime,
               ),
               const SizedBox(height: 25),
               ElevatedButton(

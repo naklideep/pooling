@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart'; // ✅ for formatting
 import 'chat_page.dart';
 
 class YourRidesPage extends StatelessWidget {
   final String userId;
   YourRidesPage({required this.userId});
+
+  String _formatTimestamp(Timestamp? timestamp) {
+    if (timestamp == null) return "Unknown";
+    final date = timestamp.toDate();
+    return DateFormat('dd MMM yyyy, hh:mm a').format(date);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,15 +37,18 @@ class YourRidesPage extends StatelessWidget {
                   .orderBy("timestamp", descending: true)
                   .snapshots(),
               builder: (context, snapshot) {
-                if (!snapshot.hasData) return Center(child: CircularProgressIndicator());
+                if (!snapshot.hasData)
+                  return Center(child: CircularProgressIndicator());
 
                 final rides = snapshot.data!.docs;
-                if (rides.isEmpty) return Center(child: Text("No posted rides yet."));
+                if (rides.isEmpty)
+                  return Center(child: Text("No posted rides yet."));
 
                 return ListView.builder(
                   itemCount: rides.length,
                   itemBuilder: (context, index) {
-                    final rideData = rides[index].data() as Map<String, dynamic>? ?? {};
+                    final rideData =
+                        rides[index].data() as Map<String, dynamic>? ?? {};
                     final status = rideData['status'] ?? 'pending';
                     final acceptedByName = rideData['acceptedByName'] ?? '';
 
@@ -52,6 +62,9 @@ class YourRidesPage extends StatelessWidget {
                           children: [
                             Text("Seats: ${rideData['seats']}"),
                             Text("Status: $status"),
+                            Text(
+                              "Posted: ${_formatTimestamp(rideData['timestamp'])}",
+                            ),
                             if (acceptedByName.isNotEmpty)
                               Text("Accepted by: $acceptedByName"),
                           ],
@@ -67,7 +80,8 @@ class YourRidesPage extends StatelessWidget {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (_) => ChatPage(rideId: rides[index].id),
+                                      builder: (_) =>
+                                          ChatPage(rideId: rides[index].id),
                                     ),
                                   );
                                 },
@@ -82,10 +96,13 @@ class YourRidesPage extends StatelessWidget {
                                       .doc(rides[index].id)
                                       .update({
                                     "status": "completed",
-                                    "completedAt": FieldValue.serverTimestamp(),
+                                    "completedAt":
+                                    FieldValue.serverTimestamp(),
                                   });
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text("Ride completed ✅")),
+                                    SnackBar(
+                                        content:
+                                        Text("Ride completed ✅")),
                                   );
                                 },
                               ),
@@ -107,29 +124,36 @@ class YourRidesPage extends StatelessWidget {
                   .orderBy("acceptedAt", descending: true)
                   .snapshots(),
               builder: (context, snapshot) {
-                if (!snapshot.hasData) return Center(child: CircularProgressIndicator());
+                if (!snapshot.hasData)
+                  return Center(child: CircularProgressIndicator());
 
                 final rides = snapshot.data!.docs;
-                if (rides.isEmpty) return Center(child: Text("No accepted rides yet."));
+                if (rides.isEmpty)
+                  return Center(child: Text("No accepted rides yet."));
 
                 return ListView.builder(
                   itemCount: rides.length,
                   itemBuilder: (context, index) {
-                    final rideData = rides[index].data() as Map<String, dynamic>? ?? {};
+                    final rideData =
+                        rides[index].data() as Map<String, dynamic>? ?? {};
                     final status = rideData['status'] ?? 'pending';
                     final postedByName = rideData['postedByName'] ?? 'Unknown';
 
                     return Card(
                       margin: EdgeInsets.all(10),
                       child: ListTile(
-                        leading: Icon(Icons.directions_car, color: Colors.green),
+                        leading:
+                        Icon(Icons.directions_car, color: Colors.green),
                         title: Text("${rideData['from']} ➝ ${rideData['to']}"),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text("Seats: ${rideData['seats']}"),
                             Text("Status: $status"),
-                            Text("Posted by: $postedByName"), // Added postedBy
+                            Text("Posted by: $postedByName"),
+                            Text(
+                              "Accepted: ${_formatTimestamp(rideData['acceptedAt'])}",
+                            ),
                           ],
                         ),
                         trailing: Row(
@@ -142,7 +166,8 @@ class YourRidesPage extends StatelessWidget {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) => ChatPage(rideId: rides[index].id),
+                                    builder: (_) =>
+                                        ChatPage(rideId: rides[index].id),
                                   ),
                                 );
                               },
@@ -157,10 +182,13 @@ class YourRidesPage extends StatelessWidget {
                                       .doc(rides[index].id)
                                       .update({
                                     "status": "completed",
-                                    "completedAt": FieldValue.serverTimestamp(),
+                                    "completedAt":
+                                    FieldValue.serverTimestamp(),
                                   });
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text("Ride completed ✅")),
+                                    SnackBar(
+                                        content:
+                                        Text("Ride completed ✅")),
                                   );
                                 },
                               ),

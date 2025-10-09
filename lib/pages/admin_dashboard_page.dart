@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart'; // for date formatting
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -11,6 +12,7 @@ class AdminDashboardPage extends StatefulWidget {
 class _AdminDashboardPageState extends State<AdminDashboardPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  DateTime? _selectedDate; // 🟢 store filter date
 
   @override
   void initState() {
@@ -22,6 +24,17 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickDate(BuildContext context) async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? now,
+      firstDate: now.subtract(const Duration(days: 365)),
+      lastDate: now.add(const Duration(days: 365)),
+    );
+    if (picked != null) setState(() => _selectedDate = picked);
   }
 
   @override
@@ -49,7 +62,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
     );
   }
 
-  // 🟢 Overview: show quick stats
+  // 🧾 Overview Tab
   Widget _buildOverviewTab() {
     return FutureBuilder(
       future: Future.wait([
@@ -91,53 +104,119 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
           children: [
             Icon(icon, size: 40, color: Colors.blueAccent),
             const SizedBox(height: 12),
-            Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Text(title,
+                style:
+                const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
-            Text(count.toString(), style: const TextStyle(fontSize: 22, color: Colors.black87)),
+            Text(count.toString(),
+                style:
+                const TextStyle(fontSize: 22, color: Colors.black87)),
           ],
         ),
       ),
     );
   }
 
-  // 🚗 Manage Rides
+  // 🚗 Manage Rides with Date Filter
   Widget _buildManageRidesTab() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('rides').snapshots(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        final rides = snapshot.data!.docs;
-
-        if (rides.isEmpty) return const Center(child: Text("No rides found"));
-
-        return ListView.builder(
-          itemCount: rides.length,
-          itemBuilder: (context, index) {
-            final data = rides[index].data() as Map<String, dynamic>;
-            return Card(
-              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              child: ListTile(
-                leading: const Icon(Icons.directions_car, color: Colors.blue),
-                title: Text("${data['from']} → ${data['to']}"),
-                subtitle: Text("Status: ${data['status'] ?? 'unknown'}"),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () => _deleteRide(rides[index].id),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.cancel, color: Colors.orange),
-                      onPressed: () => _cancelRide(rides[index].id),
-                    ),
-                  ],
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _selectedDate == null
+                      ? "Filter by date"
+                      : "Showing rides on ${DateFormat('yyyy-MM-dd').format(_selectedDate!)}",
+                  style: const TextStyle(fontSize: 16),
                 ),
               ),
-            );
-          },
-        );
-      },
+              IconButton(
+                icon: const Icon(Icons.calendar_today),
+                onPressed: () => _pickDate(context),
+              ),
+              if (_selectedDate != null)
+                IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () => setState(() => _selectedDate = null),
+                ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('rides')
+                .orderBy('timestamp', descending: true)
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              final allRides = snapshot.data!.docs;
+
+              // 🔎 Filter rides by selected date (using Timestamp)
+              final rides = _selectedDate == null
+                  ? allRides
+                  : allRides.where((ride) {
+                final data = ride.data() as Map<String, dynamic>;
+                final Timestamp? ts = data['dateTime'];
+                if (ts == null) return false;
+                final rideDate = ts.toDate();
+                return rideDate.year == _selectedDate!.year &&
+                    rideDate.month == _selectedDate!.month &&
+                    rideDate.day == _selectedDate!.day;
+              }).toList();
+
+              if (rides.isEmpty) {
+                return const Center(child: Text("No rides found"));
+              }
+
+              return ListView.builder(
+                itemCount: rides.length,
+                itemBuilder: (context, index) {
+                  final data = rides[index].data() as Map<String, dynamic>;
+                  final Timestamp? ts = data['dateTime'];
+                  final dateTime = ts?.toDate();
+                  final formattedDate = dateTime != null
+                      ? DateFormat('yyyy-MM-dd hh:mm a').format(dateTime)
+                      : 'N/A';
+
+                  return Card(
+                    margin:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    child: ListTile(
+                      leading: const Icon(Icons.directions_car,
+                          color: Colors.blue),
+                      title: Text("${data['from']} → ${data['to']}"),
+                      subtitle: Text(
+                          "Date: $formattedDate | Status: ${data['status'] ?? 'unknown'}"),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon:
+                            const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () => _deleteRide(rides[index].id),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.cancel,
+                                color: Colors.orange),
+                            onPressed: () => _cancelRide(rides[index].id),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -146,24 +225,32 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('users').snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        final users = snapshot.data!.docs;
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-        if (users.isEmpty) return const Center(child: Text("No users registered"));
+        final users = snapshot.data!.docs;
+        if (users.isEmpty) {
+          return const Center(child: Text("No users registered"));
+        }
 
         return ListView.builder(
           itemCount: users.length,
           itemBuilder: (context, index) {
             final user = users[index].data() as Map<String, dynamic>;
             final isBanned = user['isBanned'] ?? false;
+
             return Card(
-              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              margin:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               child: ListTile(
-                leading: Icon(Icons.person, color: isBanned ? Colors.red : Colors.green),
+                leading: Icon(Icons.person,
+                    color: isBanned ? Colors.red : Colors.green),
                 title: Text(user['name'] ?? "Unnamed User"),
                 subtitle: Text(user['email'] ?? "No Email"),
                 trailing: TextButton(
-                  onPressed: () => _toggleBanUser(users[index].id, isBanned),
+                  onPressed: () =>
+                      _toggleBanUser(users[index].id, isBanned),
                   child: Text(isBanned ? "Unban" : "Ban"),
                 ),
               ),
@@ -177,9 +264,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
   // 🔧 Admin actions
   Future<void> _deleteRide(String rideId) async {
     await FirebaseFirestore.instance.collection('rides').doc(rideId).delete();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Ride deleted")),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text("Ride deleted")));
   }
 
   Future<void> _cancelRide(String rideId) async {
@@ -187,9 +273,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
         .collection('rides')
         .doc(rideId)
         .update({'status': 'cancelled'});
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Ride cancelled")),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text("Ride cancelled")));
   }
 
   Future<void> _toggleBanUser(String userId, bool isBanned) async {
@@ -197,8 +282,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
         .collection('users')
         .doc(userId)
         .update({'isBanned': !isBanned});
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(isBanned ? "User unbanned" : "User banned")),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(isBanned ? "User unbanned" : "User banned")));
   }
 }

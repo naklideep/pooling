@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart'; // ✅ for date formatting
 import 'ride_card.dart';
 
 class RideFeedPage extends StatelessWidget {
   const RideFeedPage({super.key});
+
+  String _formatTimestamp(Timestamp? timestamp) {
+    if (timestamp == null) return "Unknown date";
+    final date = timestamp.toDate();
+    return DateFormat('dd MMM yyyy, hh:mm a').format(date);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,6 +40,10 @@ class RideFeedPage extends StatelessWidget {
             itemBuilder: (context, index) {
               final rideData = rides[index].data() as Map<String, dynamic>? ?? {};
               final rideId = rides[index].id;
+
+              // 🕓 format timestamp before sending to RideCard
+              final formattedTime = _formatTimestamp(rideData['timestamp']);
+              rideData['formattedTime'] = formattedTime; // add new key
 
               return RideCard(
                 rideData: rideData,

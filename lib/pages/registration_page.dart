@@ -58,7 +58,6 @@ class _RegistrationPageState extends State<RegistrationPage> {
       if (user.user != null) {
         await user.user!.sendEmailVerification();
 
-        // ✅ Save user details with isBanned = false
         await FirebaseFirestore.instance
             .collection("users")
             .doc(user.user!.uid)
@@ -67,7 +66,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
           "enrollment": enrollment,
           "email": email,
           "createdAt": Timestamp.now(),
-          "isBanned": false, // 👈 Added this field
+          "isBanned": false,
         });
 
         _showSnackBar("Verification email sent! Please verify before login.");
@@ -107,32 +106,34 @@ class _RegistrationPageState extends State<RegistrationPage> {
           child: Column(
             children: [
               TextField(
+                key: Key('nameField'),
                 controller: _nameController,
                 decoration: InputDecoration(labelText: "Name"),
               ),
               SizedBox(height: 16),
               TextField(
+                key: Key('enrollmentField'),
                 controller: _enrollmentController,
                 decoration: InputDecoration(labelText: "Enrollment"),
                 keyboardType: TextInputType.number,
               ),
               SizedBox(height: 16),
               TextField(
+                key: Key('emailField'),
                 controller: _emailController,
                 decoration: InputDecoration(labelText: "Email"),
                 keyboardType: TextInputType.emailAddress,
               ),
               SizedBox(height: 16),
               TextField(
+                key: Key('passwordField'),
                 controller: _passwordController,
                 obscureText: _obscurePassword,
                 decoration: InputDecoration(
                   labelText: "Password",
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscurePassword
-                          ? Icons.visibility
-                          : Icons.visibility_off,
+                      _obscurePassword ? Icons.visibility : Icons.visibility_off,
                     ),
                     onPressed: () {
                       setState(() {
@@ -146,6 +147,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
               _isLoading
                   ? CircularProgressIndicator()
                   : ElevatedButton(
+                key: Key('registerButton'),
                 onPressed: _register,
                 child: Text("Register", style: TextStyle(fontSize: 18)),
                 style: ElevatedButton.styleFrom(

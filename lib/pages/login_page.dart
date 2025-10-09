@@ -3,27 +3,24 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dashboard_page.dart';
 import 'registration_page.dart';
-import 'admin_dashboard_page.dart'; // 🆕 Admin page import
+import 'admin_dashboard_page.dart';
+
+const String adminEmail = "chaudharideep1106@gmail.com";
 
 class LoginPage extends StatefulWidget {
   @override
   _LoginPageState createState() => _LoginPageState();
 }
 
-// 🧩 Your admin email
-const String adminEmail = "chaudharideep1106@gmail.com";
-
 class _LoginPageState extends State<LoginPage> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _rememberMe = false;
-
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   void _login() async {
     try {
-      // 🟦 Step 1: Try to sign in
       UserCredential user = await _auth.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
@@ -40,7 +37,6 @@ class _LoginPageState extends State<LoginPage> {
 
         final userEmail = user.user!.email;
 
-        // 🟩 Step 2: Check if admin
         if (userEmail == adminEmail) {
           Navigator.pushReplacement(
             context,
@@ -49,25 +45,22 @@ class _LoginPageState extends State<LoginPage> {
           return;
         }
 
-        // 🟥 Step 3: Check if user is banned in Firestore
         final userDoc = await FirebaseFirestore.instance
             .collection('users')
             .doc(user.user!.uid)
             .get();
 
         if (userDoc.exists && (userDoc['isBanned'] == true)) {
-          await _auth.signOut(); // logout immediately
+          await _auth.signOut();
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text("You are banned from the app."),
               backgroundColor: Colors.redAccent,
             ),
           );
-
           return;
         }
 
-        // ✅ Step 4: Normal user — go to dashboard
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => DashboardPage()),
@@ -127,6 +120,7 @@ class _LoginPageState extends State<LoginPage> {
               ),
               const SizedBox(height: 40),
               TextField(
+                key: Key('emailLoginField'),
                 controller: _emailController,
                 decoration: InputDecoration(
                   labelText: "Email",
@@ -138,15 +132,14 @@ class _LoginPageState extends State<LoginPage> {
               ),
               const SizedBox(height: 20),
               TextField(
+                key: Key('passwordLoginField'),
                 controller: _passwordController,
                 obscureText: _obscurePassword,
                 decoration: InputDecoration(
                   labelText: "Password",
                   prefixIcon: const Icon(Icons.lock),
                   suffixIcon: IconButton(
-                    icon: Icon(_obscurePassword
-                        ? Icons.visibility
-                        : Icons.visibility_off),
+                    icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
                     onPressed: () {
                       setState(() {
                         _obscurePassword = !_obscurePassword;
@@ -158,7 +151,6 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
               Row(
                 children: [
                   Checkbox(
@@ -175,16 +167,16 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
               ElevatedButton(
+                key: Key('loginButton'),
                 onPressed: _login,
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 50),
                 ),
                 child: const Text("Login", style: TextStyle(fontSize: 18)),
               ),
-              const SizedBox(height: 20),
               OutlinedButton(
+                key: Key('createAccountButton'),
                 onPressed: _createAccount,
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 50),
