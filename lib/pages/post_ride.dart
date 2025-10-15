@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:intl/intl.dart'; // for formatting
+import 'package:intl/intl.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:latlong2/latlong.dart';
+import 'map_picker_page.dart';
 
 class PostRidePage extends StatefulWidget {
   const PostRidePage({super.key});
@@ -15,11 +19,80 @@ class _PostRidePageState extends State<PostRidePage> {
   final _fromController = TextEditingController();
   final _toController = TextEditingController();
   final _seatsController = TextEditingController();
-
+  LatLng? _toCoords;
   DateTime? _selectedDateTime;
   bool _isLoading = false;
 
-  // 🔹 Pick Date and Time together
+  // ✅ Get current location for "From"
+  Future<void> _fillCurrentLocation() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("❌ Location services disabled")),
+        );
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("❌ Permission denied")),
+          );
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("⚠️ Location permission permanently denied")),
+        );
+        return;
+      }
+
+      final pos = await Geolocator.getCurrentPosition();
+      List<Placemark> placemarks =
+      await placemarkFromCoordinates(pos.latitude, pos.longitude);
+
+      if (placemarks.isNotEmpty) {
+        final place = placemarks.first;
+        final address =
+            "${place.locality ?? ''}, ${place.administrativeArea ?? ''}, ${place.country ?? ''}";
+        setState(() => _fromController.text = address);
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("❌ Error: $e")));
+    }
+  }
+
+  // ✅ Pick destination via map (updated to handle {address, latLng})
+  Future<void> _pickDestination() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const MapPickerPage()),
+    );
+
+    if (result != null && result is Map<String, dynamic>) {
+      final address = result['address'] as String?;
+      final coords = result['latLng'] as LatLng?;
+
+      if (address != null && coords != null) {
+        setState(() {
+          _toController.text = address;
+          _toCoords = coords;
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("⚠️ Failed to get location details")),
+        );
+      }
+    }
+  }
+
+  // ✅ Date & time picker
   Future<void> _pickDateTime() async {
     final date = await showDatePicker(
       context: context,
@@ -35,21 +108,24 @@ class _PostRidePageState extends State<PostRidePage> {
     );
     if (time == null) return;
 
-    final combined = DateTime(
-      date.year,
-      date.month,
-      date.day,
-      time.hour,
-      time.minute,
-    );
-
-    setState(() => _selectedDateTime = combined);
+    setState(() {
+      _selectedDateTime = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        time.hour,
+        time.minute,
+      );
+    });
   }
 
+  // ✅ Post ride
   Future<void> _postRide() async {
-    if (!_formKey.currentState!.validate() || _selectedDateTime == null) {
+    if (!_formKey.currentState!.validate() ||
+        _selectedDateTime == null ||
+        _toCoords == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("⚠️ Please select a date & time")),
+        const SnackBar(content: Text("⚠️ Please complete all fields")),
       );
       return;
     }
@@ -66,24 +142,22 @@ class _PostRidePageState extends State<PostRidePage> {
 
       if (userDoc.exists && userDoc.data()?['name'] != null) {
         userName = userDoc['name'];
-      } else if (user.displayName != null && user.displayName!.isNotEmpty) {
+      } else if (user.displayName?.isNotEmpty ?? false) {
         userName = user.displayName!;
-      } else if (user.email != null && user.email!.contains('@')) {
+      } else if (user.email?.contains('@') ?? false) {
         userName = user.email!.split('@').first;
       }
 
       await FirebaseFirestore.instance.collection('rides').add({
         'from': _fromController.text.trim(),
         'to': _toController.text.trim(),
+        'to_lat': _toCoords!.latitude,
+        'to_lng': _toCoords!.longitude,
         'seats': int.tryParse(_seatsController.text.trim()) ?? 1,
         'dateTime': _selectedDateTime,
         'status': 'pending',
         'riderId': user.uid,
         'postedByName': userName,
-        'acceptedBy': '',
-        'acceptedByName': '',
-        'acceptedAt': null,
-        'completedAt': null,
         'timestamp': FieldValue.serverTimestamp(),
       });
 
@@ -92,11 +166,13 @@ class _PostRidePageState extends State<PostRidePage> {
       );
 
       _formKey.currentState!.reset();
-      setState(() => _selectedDateTime = null);
+      setState(() {
+        _selectedDateTime = null;
+        _toCoords = null;
+      });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("❌ Error posting ride: $e")),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("❌ Error posting ride: $e")));
     } finally {
       setState(() => _isLoading = false);
     }
@@ -121,17 +197,31 @@ class _PostRidePageState extends State<PostRidePage> {
             children: [
               TextFormField(
                 controller: _fromController,
-                decoration: const InputDecoration(labelText: "From"),
+                decoration: InputDecoration(
+                  labelText: "From",
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.my_location),
+                    onPressed: _fillCurrentLocation,
+                  ),
+                ),
                 validator: (v) => v!.isEmpty ? "Enter source" : null,
               ),
               TextFormField(
                 controller: _toController,
-                decoration: const InputDecoration(labelText: "To"),
-                validator: (v) => v!.isEmpty ? "Enter destination" : null,
+                readOnly: true,
+                decoration: InputDecoration(
+                  labelText: "To (tap map icon)",
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.map),
+                    onPressed: _pickDestination,
+                  ),
+                ),
+                validator: (v) => v!.isEmpty ? "Select destination" : null,
               ),
               TextFormField(
                 controller: _seatsController,
-                decoration: const InputDecoration(labelText: "Available Seats"),
+                decoration:
+                const InputDecoration(labelText: "Available Seats"),
                 keyboardType: TextInputType.number,
                 validator: (v) => v!.isEmpty ? "Enter number of seats" : null,
               ),

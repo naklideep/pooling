@@ -37,10 +37,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
       return;
     }
 
-    if (!RegExp(r'^[0-9]+$').hasMatch(enrollment)) {
-      _showSnackBar("Enrollment must contain only numbers");
+    if (!RegExp(r'^[0-9]{15}$').hasMatch(enrollment)) {
+      _showSnackBar("Enrollment must be exactly 15 digits");
       return;
-    }
+
+  }
 
     if (password.length < 6) {
       _showSnackBar("Password must be at least 6 characters long");
