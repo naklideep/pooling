@@ -1,72 +1,112 @@
-import 'package:flutter/material.dart';
+// find_ride_widget.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'chat_page.dart';
 
-class FindRideWidget extends StatelessWidget {
+class FindRideWidget extends StatefulWidget {
   final String userId;
-
   const FindRideWidget({super.key, required this.userId});
 
   @override
+  State<FindRideWidget> createState() => _FindRideWidgetState();
+}
+
+class _FindRideWidgetState extends State<FindRideWidget> {
+  String? _searchQ;
+
+  @override
   Widget build(BuildContext context) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection("rides")
-          .orderBy("timestamp", descending: true)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
-        // Filter out cancelled rides
-        final rides = snapshot.data!.docs
-            .where((ride) =>
-        (ride.data() as Map<String, dynamic>)['status'] != 'cancelled')
-            .toList();
+    return Column(
+      children: [
+        // Search row
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8),
+          child: TextField(
+            decoration: const InputDecoration(
+              prefixIcon: Icon(Icons.search),
+              hintText: 'Search destination or poster',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            onChanged: (v) => setState(() => _searchQ = v.trim().toLowerCase()),
+          ),
+        ),
 
-        if (rides.isEmpty) {
-          return const Center(child: Text("No rides available yet 🚗"));
-        }
+        // List view
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection("rides")
+                .orderBy("timestamp", descending: true)
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-        return ListView.builder(
-          itemCount: rides.length,
-          itemBuilder: (context, index) {
-            final ride = rides[index];
-            final rideData = ride.data() as Map<String, dynamic>? ?? {};
-            final status = rideData['status'] ?? 'pending';
+              // Filter rides: not cancelled/expired and not accepted by current user
+              final rides = snapshot.data!.docs.where((rideSnap) {
+                final ride = rideSnap.data() as Map<String, dynamic>;
 
-            final from = rideData['from'] ?? "N/A";
-            final to = rideData['to'] ?? "N/A";
-            final seats = rideData['seats']?.toString() ?? "N/A";
-            final riderName =
-            rideData['postedByName']?.toString().trim().isNotEmpty ?? false
-                ? rideData['postedByName']
-                : "Unknown";
+                if (ride['status'] == 'cancelled' || ride['status'] == 'expired') return false;
 
-            return Card(
-              margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              child: ListTile(
-                leading: const Icon(Icons.directions_car, color: Colors.blue),
-                title: Text("$from ➝ $to",
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("Seats: $seats"),
-                    Text("Posted by: $riderName"),
-                  ],
-                ),
-                trailing:
-                _buildTrailing(context, ride.id, rideData, status, riderName),
-              ),
-            );
-          },
-        );
-      },
+                final acceptedByList = List.from(ride['acceptedByList'] ?? []);
+                if (acceptedByList.contains(currentUserId)) return false;
+
+                if (_searchQ == null || _searchQ!.isEmpty) return true;
+                final to = (ride['to'] ?? '').toString().toLowerCase();
+                final poster = (ride['postedByName'] ?? '').toString().toLowerCase();
+                return to.contains(_searchQ!) || poster.contains(_searchQ!);
+              }).toList();
+
+              if (rides.isEmpty) {
+                return const Center(child: Text("No rides available 🚗"));
+              }
+
+              return ListView.builder(
+                itemCount: rides.length,
+                itemBuilder: (context, index) {
+                  final rideSnap = rides[index];
+                  final rideData = rideSnap.data() as Map<String, dynamic>;
+                  final status = rideData['status'] ?? 'pending';
+                  final from = rideData['from'] ?? "N/A";
+                  final to = rideData['to'] ?? "N/A";
+                  final remainingSeats =
+                  (rideData['remainingSeats'] ?? rideData['seats'] ?? 0).toString();
+                  final riderName = (rideData['postedByName']?.toString().trim().isNotEmpty ?? false)
+                      ? rideData['postedByName']
+                      : "Unknown";
+                  final cost = rideData['estimatedCost'] ?? 'N/A';
+
+                  return Card(
+                    margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: ListTile(
+                      leading: const Icon(Icons.directions_car, color: Colors.blue, size: 40),
+                      title: Text("$from ➝ $to", style: const TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 6),
+                          Text("Seats: $remainingSeats"),
+                          const SizedBox(height: 6),
+                          Text("Posted by: $riderName"),
+                          const SizedBox(height: 6),
+                          Text("💰 Cost: ₹$cost"),
+                        ],
+                      ),
+                      trailing: _buildTrailing(context, rideSnap.id, rideData, status, riderName),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -77,50 +117,60 @@ class FindRideWidget extends StatelessWidget {
     final currentUserName =
         currentUser?.displayName ?? currentUser?.email?.split('@').first ?? "User";
 
-    // If ride belongs to current user
+    final remaining = ((rideData['remainingSeats'] ?? rideData['seats'] ?? 0) as num).toInt();
     if (rideData['riderId'] == currentUserId) {
       return ElevatedButton(
         style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
         onPressed: () => _confirmCancel(context, rideId),
         child: const Text("Cancel Ride"),
       );
+    } else if (remaining <= 0) {
+      return const Text("No seats left", style: TextStyle(color: Colors.grey));
+    } else {
+      return ElevatedButton(
+        onPressed: () async {
+          final docRef = FirebaseFirestore.instance.collection('rides').doc(rideId);
+          try {
+            await FirebaseFirestore.instance.runTransaction((txn) async {
+              final snapshot = await txn.get(docRef);
+              if (!snapshot.exists) throw Exception("Ride no longer exists");
+              final data = snapshot.data() as Map<String, dynamic>;
+              int remainingSeatsNow = ((data['remainingSeats'] ?? data['seats'] ?? 1) as num).toInt();
+              final allowMultiple = data['allowMultiple'] ?? false;
+
+              if (remainingSeatsNow <= 0) throw Exception("No seats left");
+
+              remainingSeatsNow -= 1;
+              final updates = <String, dynamic>{
+                'remainingSeats': remainingSeatsNow,
+                'acceptedAt': FieldValue.serverTimestamp(),
+              };
+
+              if (!allowMultiple || remainingSeatsNow == 0) {
+                updates['status'] = 'accepted';
+                updates['acceptedBy'] = currentUserId;
+                updates['acceptedByName'] = currentUserName;
+              } else {
+                final acceptedByList = List.from(data['acceptedByList'] ?? []);
+                if (!acceptedByList.contains(currentUserId)) acceptedByList.add(currentUserId);
+                updates['acceptedByList'] = acceptedByList;
+              }
+
+              txn.update(docRef, updates);
+            });
+
+            ScaffoldMessenger.of(context)
+                .showSnackBar(const SnackBar(content: Text("Ride accepted successfully ✅")));
+            Navigator.push(
+                context, MaterialPageRoute(builder: (_) => ChatPage(rideId: rideId)));
+          } catch (e) {
+            ScaffoldMessenger.of(context)
+                .showSnackBar(SnackBar(content: Text("Error accepting ride: $e")));
+          }
+        },
+        child: const Text("Accept & Chat"),
+      );
     }
-
-    // If already accepted
-    if (status == "accepted") {
-      final acceptedBy = rideData['acceptedByName'] ?? "Someone";
-      return Text("Accepted by $acceptedBy ✅",
-          style: const TextStyle(color: Colors.green));
-    }
-
-    // Otherwise show accept button
-    return ElevatedButton(
-      onPressed: () async {
-        try {
-          await FirebaseFirestore.instance
-              .collection("rides")
-              .doc(rideId)
-              .update({
-            "status": "accepted",
-            "acceptedBy": currentUserId,
-            "acceptedAt": FieldValue.serverTimestamp(),
-            "acceptedByName": currentUserName,
-          });
-
-          ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("Ride accepted successfully ✅")));
-
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => ChatPage(rideId: rideId)),
-          );
-        } catch (e) {
-          ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text("Error accepting ride: $e")));
-        }
-      },
-      child: const Text("Accept & Chat"),
-    );
   }
 
   void _confirmCancel(BuildContext context, String rideId) {
@@ -130,10 +180,7 @@ class FindRideWidget extends StatelessWidget {
         title: const Text("Cancel Ride"),
         content: const Text("Are you sure you want to cancel this ride?"),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text("No"),
-          ),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text("No")),
           TextButton(
             onPressed: () {
               _cancelRide(context, rideId);
@@ -148,13 +195,9 @@ class FindRideWidget extends StatelessWidget {
 
   Future<void> _cancelRide(BuildContext context, String rideId) async {
     try {
-      await FirebaseFirestore.instance
-          .collection("rides")
-          .doc(rideId)
-          .update({'status': 'cancelled'});
-
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Ride cancelled successfully ❌")));
+      await FirebaseFirestore.instance.collection('rides').doc(rideId).update({'status': 'cancelled'});
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text("Ride cancelled successfully ❌")));
     } catch (e) {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text("Failed to cancel ride: $e")));
