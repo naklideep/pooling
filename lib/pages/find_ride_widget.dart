@@ -1,4 +1,5 @@
 // find_ride_widget.dart
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -14,6 +15,29 @@ class FindRideWidget extends StatefulWidget {
 
 class _FindRideWidgetState extends State<FindRideWidget> {
   String? _searchQ;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    // Periodically refresh the list to update countdowns
+    _timer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  String _formatDuration(Duration duration) {
+    if (duration.isNegative) return "Expired";
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes % 60;
+    return "${hours}h ${minutes}m left";
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +45,7 @@ class _FindRideWidgetState extends State<FindRideWidget> {
 
     return Column(
       children: [
-        // Search row
+        // Search bar
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8),
           child: TextField(
@@ -35,7 +59,7 @@ class _FindRideWidgetState extends State<FindRideWidget> {
           ),
         ),
 
-        // List view
+        // Ride list
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance
@@ -47,15 +71,30 @@ class _FindRideWidgetState extends State<FindRideWidget> {
                 return const Center(child: CircularProgressIndicator());
               }
 
-              // Filter rides: not cancelled/expired and not accepted by current user
               final rides = snapshot.data!.docs.where((rideSnap) {
                 final ride = rideSnap.data() as Map<String, dynamic>;
 
+                // Skip cancelled or expired rides
                 if (ride['status'] == 'cancelled' || ride['status'] == 'expired') return false;
 
+                // Automatically expire rides older than 12 hours
+                final ts = ride['timestamp'] as Timestamp?;
+                if (ts != null) {
+                  final age = DateTime.now().difference(ts.toDate());
+                  if (age.inHours >= 12) {
+                    FirebaseFirestore.instance
+                        .collection('rides')
+                        .doc(rideSnap.id)
+                        .update({'status': 'expired'});
+                    return false;
+                  }
+                }
+
+                // Skip rides already accepted by current user
                 final acceptedByList = List.from(ride['acceptedByList'] ?? []);
                 if (acceptedByList.contains(currentUserId)) return false;
 
+                // Search filter
                 if (_searchQ == null || _searchQ!.isEmpty) return true;
                 final to = (ride['to'] ?? '').toString().toLowerCase();
                 final poster = (ride['postedByName'] ?? '').toString().toLowerCase();
@@ -81,24 +120,47 @@ class _FindRideWidgetState extends State<FindRideWidget> {
                       : "Unknown";
                   final cost = rideData['estimatedCost'] ?? 'N/A';
 
+                  // Time left until 12h expiry
+                  final ts = rideData['timestamp'] as Timestamp?;
+                  final timeLeft = ts != null
+                      ? _formatDuration(
+                      (ts.toDate().add(const Duration(hours: 12))).difference(DateTime.now())
+                  )
+                      : 'N/A';
+
                   return Card(
-                    margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    elevation: 3,
+                    margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    child: ListTile(
-                      leading: const Icon(Icons.directions_car, color: Colors.blue, size: 40),
-                      title: Text("$from ➝ $to", style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 6),
-                          Text("Seats: $remainingSeats"),
-                          const SizedBox(height: 6),
-                          Text("Posted by: $riderName"),
-                          const SizedBox(height: 6),
-                          Text("💰 Cost: ₹$cost"),
-                        ],
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: ListTile(
+                        leading: const Icon(Icons.directions_car, color: Colors.blue, size: 40),
+                        title: Text("$from ➝ $to", style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 6),
+                            Text("Seats: $remainingSeats"),
+                            const SizedBox(height: 4),
+                            Text("Posted by: $riderName"),
+                            const SizedBox(height: 4),
+                            Text("💰 Cost: ₹$cost"),
+                            const SizedBox(height: 4),
+                            Text("⏱ $timeLeft", style: const TextStyle(color: Colors.red)),
+                          ],
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.info_outline, color: Colors.blue),
+                              onPressed: () => _showRideDetails(rideData),
+                            ),
+                            _buildTrailing(context, rideSnap.id, rideData, status, riderName),
+                          ],
+                        ),
                       ),
-                      trailing: _buildTrailing(context, rideSnap.id, rideData, status, riderName),
                     ),
                   );
                 },
@@ -107,6 +169,34 @@ class _FindRideWidgetState extends State<FindRideWidget> {
           ),
         ),
       ],
+    );
+  }
+
+  void _showRideDetails(Map<String, dynamic> rideData) {
+    showModalBottomSheet(
+      context: context,
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("🚗 Ride Details", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            const SizedBox(height: 8),
+            Text("From: ${rideData['from']}"),
+            Text("To: ${rideData['to']}"),
+            Text(
+                "Date & Time: ${rideData['dateTime'] != null ? (rideData['dateTime'] as Timestamp).toDate().toString() : 'N/A'}"),
+            Text("Seats Available: ${rideData['remainingSeats'] ?? rideData['seats']}"),
+            Text("Ride Type: ${rideData['rideType']}"),
+            Text("Allow Multiple: ${rideData['allowMultiple'] ? 'Yes' : 'No'}"),
+            Text("Distance: ${rideData['distance_km']?.toStringAsFixed(2) ?? 'N/A'} km"),
+            Text("Duration: ${rideData['duration_min']?.toStringAsFixed(1) ?? 'N/A'} min"),
+            const SizedBox(height: 8),
+            Text("Posted By: ${rideData['postedByName'] ?? 'Unknown'}"),
+          ],
+        ),
+      ),
     );
   }
 

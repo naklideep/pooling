@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:intl/intl.dart';
 
 class ChatPage extends StatefulWidget {
   final String rideId;
@@ -17,91 +16,117 @@ class _ChatPageState extends State<ChatPage> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
-  FlutterLocalNotificationsPlugin();
+  bool _isTyping = false;
 
   @override
   void initState() {
     super.initState();
-    _initializeNotifications();
-    _listenForMessages();
+    _listenTypingStatus();
   }
 
-  // Initialize local notifications
-  Future<void> _initializeNotifications() async {
-    const AndroidInitializationSettings initSettingsAndroid =
-    AndroidInitializationSettings('@mipmap/ic_launcher');
-
-    const InitializationSettings initSettings =
-    InitializationSettings(android: initSettingsAndroid);
-
-    await _flutterLocalNotificationsPlugin.initialize(initSettings);
-  }
-
-  // Show notification when new message received
-  void _listenForMessages() {
-    FirebaseFirestore.instance
+  // Listen to typing status of other users
+  void _listenTypingStatus() {
+    _firestore
         .collection('rides')
         .doc(widget.rideId)
-        .collection('chats')
-        .orderBy('timestamp', descending: true)
+        .collection('typing')
         .snapshots()
         .listen((snapshot) {
-      if (snapshot.docChanges.isNotEmpty) {
-        final msg = snapshot.docChanges.first.doc.data();
-        if (msg != null &&
-            msg['senderId'] != _auth.currentUser!.uid &&
-            msg['message'] != null) {
-          _showNotification(msg['message']);
-        }
-      }
+      setState(() {
+        _isTyping = snapshot.docs.any((doc) =>
+        doc.id != _auth.currentUser!.uid && doc['typing'] == true);
+      });
     });
   }
 
-  Future<void> _showNotification(String message) async {
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
-    AndroidNotificationDetails(
-      'chat_channel',
-      'Chat Notifications',
-      importance: Importance.max,
-      priority: Priority.high,
-      showWhen: true,
-    );
-
-    const NotificationDetails platformChannelSpecifics =
-    NotificationDetails(android: androidPlatformChannelSpecifics);
-
-    await _flutterLocalNotificationsPlugin.show(
-      0,
-      'New Message 💬',
-      message,
-      platformChannelSpecifics,
-    );
+  // Update typing status
+  void _updateTyping(bool typing) {
+    _firestore
+        .collection('rides')
+        .doc(widget.rideId)
+        .collection('typing')
+        .doc(_auth.currentUser!.uid)
+        .set({'typing': typing});
   }
 
+  // Send text message
   Future<void> sendMessage() async {
     String message = _messageController.text.trim();
     if (message.isEmpty) return;
 
-    User? user = _auth.currentUser;
-    if (user != null) {
-      await _firestore
-          .collection('rides')
-          .doc(widget.rideId)
-          .collection('chats')
-          .add({
-        'senderId': user.uid,
-        'message': message,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-      _messageController.clear();
+    await _firestore
+        .collection('rides')
+        .doc(widget.rideId)
+        .collection('chats')
+        .add({
+      'senderId': _auth.currentUser!.uid,
+      'message': message,
+      'timestamp': FieldValue.serverTimestamp(),
+      'readBy': [_auth.currentUser!.uid],
+    });
+
+    _messageController.clear();
+    _updateTyping(false);
+  }
+
+  // Simple profanity filter
+  String _filterProfanity(String text) {
+    final banned = ['badword1', 'badword2']; // add more if needed
+    String filtered = text;
+    for (var word in banned) {
+      filtered = filtered.replaceAll(RegExp(word, caseSensitive: false), '****');
     }
+    return filtered;
+  }
+
+  Widget _buildMessageTile(Map<String, dynamic> msg) {
+    bool isMe = msg['senderId'] == _auth.currentUser!.uid;
+    Timestamp? ts = msg['timestamp'];
+    String time = ts != null
+        ? DateFormat('hh:mm a').format(ts.toDate())
+        : 'Sending...';
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: isMe ? Colors.blue : Colors.grey[300],
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          crossAxisAlignment:
+          isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          children: [
+            Text(
+              _filterProfanity(msg['message']),
+              style: TextStyle(color: isMe ? Colors.white : Colors.black),
+            ),
+            Text(
+              time,
+              style: TextStyle(
+                  fontSize: 10, color: isMe ? Colors.white70 : Colors.black54),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Ride Chat')),
+      appBar: AppBar(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Ride Chat'),
+            if (_isTyping)
+              const Text('Someone is typing...', style: TextStyle(fontSize: 12))
+          ],
+        ),
+      ),
       body: Column(
         children: [
           Expanded(
@@ -116,34 +141,18 @@ class _ChatPageState extends State<ChatPage> {
                 if (!snapshot.hasData) {
                   return const Center(child: CircularProgressIndicator());
                 }
-
                 var messages = snapshot.data!.docs;
-
                 return ListView.builder(
                   reverse: true,
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
-                    var msg = messages[index];
-                    bool isMe = msg['senderId'] == _auth.currentUser!.uid;
-
-                    return Container(
-                      alignment:
-                      isMe ? Alignment.centerRight : Alignment.centerLeft,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: isMe ? Colors.blue : Colors.grey[300],
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        padding: const EdgeInsets.all(10),
-                        child: Text(
-                          msg['message'],
-                          style: TextStyle(
-                              color: isMe ? Colors.white : Colors.black),
-                        ),
-                      ),
-                    );
+                    var msg = messages[index].data()! as Map<String, dynamic>;
+                    if (!msg['readBy'].contains(_auth.currentUser!.uid)) {
+                      messages[index].reference.update({
+                        'readBy': FieldValue.arrayUnion([_auth.currentUser!.uid])
+                      });
+                    }
+                    return _buildMessageTile(msg);
                   },
                 );
               },
@@ -161,10 +170,12 @@ class _ChatPageState extends State<ChatPage> {
                       hintText: 'Type a message...',
                       border: InputBorder.none,
                     ),
+                    onChanged: (text) => _updateTyping(text.isNotEmpty),
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.send, color: Colors.blue),
+                  icon: const Icon(Icons.send),
+                  color: Colors.blue,
                   onPressed: sendMessage,
                 ),
               ],

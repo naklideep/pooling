@@ -1,3 +1,4 @@
+// post_ride.dart
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -32,17 +33,14 @@ class _PostRidePageState extends State<PostRidePage> {
   double? _distanceKm;
   double? _durationMin;
 
-  // Replace with your OpenRouteService API key
-  final String orsApiKey = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjAzOThjYTYwYTU0ZDRkNmRiYWE0OWM4MjNiMjk1YzA5IiwiaCI6Im11cm11cjY0In0=";
+  final String orsApiKey = "YOUR_OPENROUTESERVICE_API_KEY";
 
-  // ✅ Get current location for "From"
   Future<void> _fillCurrentLocation() async {
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("❌ Location services disabled")),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text("❌ Location services disabled")));
         return;
       }
 
@@ -50,23 +48,20 @@ class _PostRidePageState extends State<PostRidePage> {
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("❌ Permission denied")),
-          );
+          ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text("❌ Permission denied")));
           return;
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("⚠️ Location permission permanently denied")),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text("⚠️ Location permission permanently denied")));
         return;
       }
 
       final pos = await Geolocator.getCurrentPosition();
-      List<Placemark> placemarks =
-      await placemarkFromCoordinates(pos.latitude, pos.longitude);
+      List<Placemark> placemarks = await placemarkFromCoordinates(pos.latitude, pos.longitude);
 
       if (placemarks.isNotEmpty) {
         final place = placemarks.first;
@@ -83,7 +78,6 @@ class _PostRidePageState extends State<PostRidePage> {
     }
   }
 
-  // ✅ Pick destination via map (returns address + latLng)
   Future<void> _pickDestination() async {
     final result = await Navigator.push(
       context,
@@ -93,14 +87,11 @@ class _PostRidePageState extends State<PostRidePage> {
     if (result != null && result is Map<String, dynamic>) {
       final address = result['address'] as String?;
       final coords = result['latLng'] as LatLng?;
-
       if (address != null && coords != null) {
         setState(() {
           _toController.text = address;
           _toCoords = coords;
         });
-
-        // After selecting destination, auto-calc route info
         if (_fromCoords != null && _toCoords != null) {
           await _calculateRouteInfo();
         }
@@ -108,7 +99,6 @@ class _PostRidePageState extends State<PostRidePage> {
     }
   }
 
-  // ✅ Use OpenRouteService to calculate distance and duration
   Future<void> _calculateRouteInfo() async {
     try {
       final url = Uri.parse(
@@ -118,20 +108,16 @@ class _PostRidePageState extends State<PostRidePage> {
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
         final props = data['features'][0]['properties']['segments'][0];
-
         setState(() {
-          _distanceKm = props['distance'] / 1000; // meters to km
-          _durationMin = props['duration'] / 60; // seconds to minutes
+          _distanceKm = props['distance'] / 1000;
+          _durationMin = props['duration'] / 60;
         });
-      } else {
-        throw Exception("Failed to fetch route info");
       }
     } catch (e) {
       debugPrint("Error fetching route: $e");
     }
   }
 
-  // ✅ Pick date & time
   Future<void> _pickDateTime() async {
     final date = await showDatePicker(
       context: context,
@@ -148,25 +134,17 @@ class _PostRidePageState extends State<PostRidePage> {
     if (time == null) return;
 
     setState(() {
-      _selectedDateTime = DateTime(
-        date.year,
-        date.month,
-        date.day,
-        time.hour,
-        time.minute,
-      );
+      _selectedDateTime = DateTime(date.year, date.month, date.day, time.hour, time.minute);
     });
   }
 
-  // ✅ Post ride
   Future<void> _postRide() async {
     if (!_formKey.currentState!.validate() ||
         _selectedDateTime == null ||
         _fromCoords == null ||
         _toCoords == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("⚠️ Please complete all fields")),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text("⚠️ Please complete all fields")));
       return;
     }
 
@@ -188,9 +166,8 @@ class _PostRidePageState extends State<PostRidePage> {
         userName = user.email!.split('@').first;
       }
 
-      // Calculate estimated cost (₹3/km per seat)
-      final estCost =
-          (_distanceKm != null ? _distanceKm! * 3 : 20) * (int.tryParse(_seatsController.text) ?? 1);
+      final estCost = (_distanceKm != null ? _distanceKm! * 3 : 20) *
+          (int.tryParse(_seatsController.text) ?? 1);
 
       await FirebaseFirestore.instance.collection('rides').add({
         'from': _fromController.text.trim(),
@@ -200,6 +177,7 @@ class _PostRidePageState extends State<PostRidePage> {
         'to_lat': _toCoords!.latitude,
         'to_lng': _toCoords!.longitude,
         'seats': int.tryParse(_seatsController.text.trim()) ?? 1,
+        'remainingSeats': int.tryParse(_seatsController.text.trim()) ?? 1,
         'rideType': _selectedRideType,
         'allowMultiple': _allowMultiple,
         'distance_km': _distanceKm,
@@ -209,12 +187,11 @@ class _PostRidePageState extends State<PostRidePage> {
         'status': 'pending',
         'riderId': user.uid,
         'postedByName': userName,
-        'timestamp': FieldValue.serverTimestamp(),
+        'timestamp': FieldValue.serverTimestamp(), // used for expiry
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("✅ Ride posted successfully by $userName")),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("✅ Ride posted successfully by $userName")));
 
       _formKey.currentState!.reset();
       setState(() {
@@ -249,7 +226,6 @@ class _PostRidePageState extends State<PostRidePage> {
           key: _formKey,
           child: ListView(
             children: [
-              // From field
               TextFormField(
                 controller: _fromController,
                 decoration: InputDecoration(
@@ -261,8 +237,6 @@ class _PostRidePageState extends State<PostRidePage> {
                 ),
                 validator: (v) => v!.isEmpty ? "Enter source" : null,
               ),
-
-              // To field
               TextFormField(
                 controller: _toController,
                 readOnly: true,
@@ -275,8 +249,6 @@ class _PostRidePageState extends State<PostRidePage> {
                 ),
                 validator: (v) => v!.isEmpty ? "Select destination" : null,
               ),
-
-              // Ride type dropdown (only Car & Bike)
               const SizedBox(height: 10),
               DropdownButtonFormField<String>(
                 value: _selectedRideType,
@@ -286,30 +258,23 @@ class _PostRidePageState extends State<PostRidePage> {
                     .toList(),
                 onChanged: (v) => setState(() => _selectedRideType = v),
               ),
-
-              // Allow multiple passengers
               SwitchListTile(
                 title: const Text("Allow multiple passengers"),
                 value: _allowMultiple,
                 onChanged: (v) => setState(() => _allowMultiple = v),
               ),
-
-              // Seats
               TextFormField(
                 controller: _seatsController,
                 decoration: const InputDecoration(labelText: "Available Seats"),
                 keyboardType: TextInputType.number,
                 validator: (v) => v!.isEmpty ? "Enter number of seats" : null,
               ),
-
               const SizedBox(height: 16),
               OutlinedButton.icon(
                 icon: const Icon(Icons.calendar_today),
                 label: Text(dateTimeText),
                 onPressed: _pickDateTime,
               ),
-
-              // Show distance & duration if available
               if (_distanceKm != null && _durationMin != null)
                 Padding(
                   padding: const EdgeInsets.all(8.0),
@@ -318,7 +283,6 @@ class _PostRidePageState extends State<PostRidePage> {
                     style: const TextStyle(fontWeight: FontWeight.w500),
                   ),
                 ),
-
               const SizedBox(height: 25),
               ElevatedButton(
                 onPressed: _isLoading ? null : _postRide,
