@@ -1,8 +1,10 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart' as http;
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
 class RegistrationPage extends StatefulWidget {
@@ -21,23 +23,55 @@ class _RegistrationPageState extends State<RegistrationPage> {
   File? _idCardImage;
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // 🖼️ Pick ID Card from Gallery
+  // Pick ID Card and verify tamper
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: ImageSource.gallery);
 
-    if (picked != null) {
-      setState(() {
-        _idCardImage = File(picked.path);
-      });
-      await _extractTextFromImage(_idCardImage!);
-    } else {
+    if (picked == null) {
       _showSnackBar("No image selected");
+      return;
+    }
+
+    setState(() {
+      _idCardImage = File(picked.path);
+      _enrollmentController.text = "";
+      _isLoading = true;
+    });
+
+    try {
+      final bytes = await _idCardImage!.readAsBytes();
+      final base64Image = base64Encode(bytes);
+
+      final response = await http.post(
+        Uri.parse("https://ghartak-verifier.onrender.com/analyze"),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({"image_base64": base64Image}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data["tampered"] == true) {
+          _showSnackBar("⚠️ ID appears tampered. Try another image.");
+          setState(() => _isLoading = false);
+          return;
+        }
+      } else {
+        _showSnackBar("⚠️ Verification service error. Skipping tamper check.");
+      }
+
+      await _extractTextFromImage(_idCardImage!);
+
+    } catch (e) {
+      _showSnackBar("❌ Error processing image: $e");
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
-  // 🧠 Extract Enrollment Number from Image
+  // Extract Enrollment Number
   Future<void> _extractTextFromImage(File imageFile) async {
     final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
     final inputImage = InputImage.fromFile(imageFile);
@@ -49,11 +83,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
     for (var block in recognizedText.blocks) {
       for (var line in block.lines) {
         if (enrollmentRegex.hasMatch(line.text)) {
-          extractedEnrollment =
-          enrollmentRegex.firstMatch(line.text)!.group(0)!;
+          extractedEnrollment = enrollmentRegex.firstMatch(line.text)!.group(0)!;
           break;
         }
       }
+      if (extractedEnrollment.isNotEmpty) break;
     }
 
     if (extractedEnrollment.isNotEmpty) {
@@ -68,7 +102,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
     textRecognizer.close();
   }
 
-  // 🔐 Registration Logic
+  // Registration logic compatible with your rules
   void _register() async {
     String name = _nameController.text.trim();
     String enrollment = _enrollmentController.text.trim();
@@ -88,53 +122,55 @@ class _RegistrationPageState extends State<RegistrationPage> {
     setState(() => _isLoading = true);
 
     try {
-      // 🔍 Check if enrollment already exists
-      final existingUser = await FirebaseFirestore.instance
+      // 1️⃣ Create Auth User
+      UserCredential userCred = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      User user = userCred.user!;
+      await user.reload();
+
+      // 2️⃣ Check if enrollment exists after auth (rules allow it)
+      final existingUser = await _firestore
           .collection("users")
           .where("enrollment", isEqualTo: enrollment)
           .limit(1)
           .get();
 
       if (existingUser.docs.isNotEmpty) {
+        await user.delete(); // rollback signup
         _showSnackBar("⚠️ Enrollment already registered!");
         setState(() => _isLoading = false);
         return;
       }
 
-      // 👤 Create new user
-      UserCredential user = await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      // 3️⃣ Write Firestore document under UID
+      await _firestore.collection("users").doc(user.uid).set({
+        "name": name,
+        "enrollment": enrollment,
+        "email": email,
+        "createdAt": Timestamp.now(),
+        "isBanned": false,
+      });
 
-      if (user.user != null) {
-        await user.user!.sendEmailVerification();
+      // 4️⃣ Send email verification
+      await user.sendEmailVerification();
 
-        await FirebaseFirestore.instance
-            .collection("users")
-            .doc(user.user!.uid)
-            .set({
-          "name": name,
-          "enrollment": enrollment,
-          "email": email,
-          "createdAt": Timestamp.now(),
-          "isBanned": false,
-        });
-
-        _showSnackBar("✅ Verification email sent! Please verify before login.");
-        Navigator.pop(context);
-      }
+      _showSnackBar("✅ Registration successful! Verify email.");
+      Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
       _showSnackBar(e.message ?? "Registration failed");
     } catch (e) {
-      _showSnackBar("Something went wrong. Try again.");
+      _showSnackBar("Something went wrong: $e");
     } finally {
       setState(() => _isLoading = false);
     }
   }
 
   void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -160,8 +196,6 @@ class _RegistrationPageState extends State<RegistrationPage> {
                 decoration: InputDecoration(labelText: "Name"),
               ),
               SizedBox(height: 16),
-
-              // 🧾 Enrollment field (READ-ONLY)
               TextField(
                 controller: _enrollmentController,
                 readOnly: true,
@@ -171,7 +205,6 @@ class _RegistrationPageState extends State<RegistrationPage> {
                 ),
               ),
               SizedBox(height: 16),
-
               TextField(
                 controller: _emailController,
                 decoration: InputDecoration(labelText: "Email"),
@@ -196,8 +229,6 @@ class _RegistrationPageState extends State<RegistrationPage> {
                 ),
               ),
               SizedBox(height: 20),
-
-              // 🪪 Upload ID Card (Gallery)
               ElevatedButton.icon(
                 onPressed: _pickImage,
                 icon: Icon(Icons.photo_library),
@@ -208,7 +239,6 @@ class _RegistrationPageState extends State<RegistrationPage> {
                   padding: const EdgeInsets.all(8.0),
                   child: Image.file(_idCardImage!, height: 150),
                 ),
-
               SizedBox(height: 24),
               _isLoading
                   ? CircularProgressIndicator()
