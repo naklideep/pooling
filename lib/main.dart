@@ -4,6 +4,7 @@ import 'firebase_options.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'pages/login_page.dart';
+import 'pages/admin_dashboard_page.dart'; // ✅ Import admin page here
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 FlutterLocalNotificationsPlugin();
@@ -35,10 +36,7 @@ void _showLocalNotification(RemoteMessage message) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await _initializeNotifications();
 
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
@@ -47,7 +45,6 @@ void main() async {
 }
 
 Future<void> _initializeNotifications() async {
-
   const AndroidInitializationSettings androidInitSettings =
   AndroidInitializationSettings('@mipmap/ic_launcher');
 
@@ -72,7 +69,14 @@ class GharTakApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'GharTak',
-      home: LoginPage(),
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        useMaterial3: true,
+      ),
+      home:  LoginPage(),
+      routes: {
+        '/admin': (_) => const AdminDashboardPage(), // ✅ Ensure this route exists
+      },
     );
   }
 }

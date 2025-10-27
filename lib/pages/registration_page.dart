@@ -103,12 +103,14 @@ class _RegistrationPageState extends State<RegistrationPage> {
   }
 
   // Registration logic compatible with your rules
+  // Registration logic - simplified without enrollment check
   void _register() async {
     String name = _nameController.text.trim();
     String enrollment = _enrollmentController.text.trim();
     String email = _emailController.text.trim();
     String password = _passwordController.text.trim();
 
+    // Validation
     if (name.isEmpty || email.isEmpty || password.isEmpty) {
       _showSnackBar("All fields are required");
       return;
@@ -119,50 +121,56 @@ class _RegistrationPageState extends State<RegistrationPage> {
       return;
     }
 
+    if (password.length < 6) {
+      _showSnackBar("Password must be at least 6 characters");
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
-      // 1️⃣ Create Auth User
+      // 1️⃣ Create Firebase Auth User
       UserCredential userCred = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
 
       User user = userCred.user!;
-      await user.reload();
 
-      // 2️⃣ Check if enrollment exists after auth (rules allow it)
-      final existingUser = await _firestore
-          .collection("users")
-          .where("enrollment", isEqualTo: enrollment)
-          .limit(1)
-          .get();
-
-      if (existingUser.docs.isNotEmpty) {
-        await user.delete(); // rollback signup
-        _showSnackBar("⚠️ Enrollment already registered!");
-        setState(() => _isLoading = false);
-        return;
-      }
-
-      // 3️⃣ Write Firestore document under UID
+      // 2️⃣ Create Firestore document immediately (no enrollment check)
       await _firestore.collection("users").doc(user.uid).set({
         "name": name,
         "enrollment": enrollment,
         "email": email,
-        "createdAt": Timestamp.now(),
+        "createdAt": FieldValue.serverTimestamp(),
         "isBanned": false,
+        "verified": false,
+        "role": "user", // Default role
       });
 
-      // 4️⃣ Send email verification
+      // 3️⃣ Send email verification
       await user.sendEmailVerification();
 
-      _showSnackBar("✅ Registration successful! Verify email.");
+      _showSnackBar("✅ Registration successful! Please verify your email.");
       Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
-      _showSnackBar(e.message ?? "Registration failed");
+      String errorMsg;
+      switch (e.code) {
+        case 'email-already-in-use':
+          errorMsg = "❌ This email is already registered";
+          break;
+        case 'weak-password':
+          errorMsg = "❌ Password is too weak";
+          break;
+        case 'invalid-email':
+          errorMsg = "❌ Invalid email format";
+          break;
+        default:
+          errorMsg = e.message ?? "❌ Registration failed";
+      }
+      _showSnackBar(errorMsg);
     } catch (e) {
-      _showSnackBar("Something went wrong: $e");
+      _showSnackBar("❌ Something went wrong: $e");
     } finally {
       setState(() => _isLoading = false);
     }
