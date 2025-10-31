@@ -186,32 +186,30 @@ class _YourRidesPageState extends State<YourRidesPage> {
               stream: FirebaseFirestore.instance
                   .collection("rides")
                   .where('acceptedBy', isEqualTo: widget.userId)
-                  .where('status', isEqualTo: 'accepted')
+                  .where('status', whereIn: ['accepted', 'completed', 'expired'])
                   .orderBy("acceptedAt", descending: true)
                   .snapshots(),
               builder: (context, snapshot) {
-                if (!snapshot.hasData) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
+                }
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return const Center(child: Text("No accepted rides yet."));
                 }
 
                 final rides = snapshot.data!.docs;
-                if (rides.isEmpty) {
-                  return const Center(child: Text("No accepted rides yet."));
-                }
 
                 return ListView.builder(
                   itemCount: rides.length,
                   itemBuilder: (context, index) {
-                    final rideData =
-                        rides[index].data() as Map<String, dynamic>? ?? {};
+                    final rideData = rides[index].data() as Map<String, dynamic>? ?? {};
                     final status = rideData['status'] ?? 'pending';
                     final postedByName = rideData['postedByName'] ?? 'Unknown';
 
                     return Card(
                       margin: const EdgeInsets.all(10),
                       child: ListTile(
-                        leading:
-                        const Icon(Icons.directions_car, color: Colors.green),
+                        leading: const Icon(Icons.directions_car, color: Colors.green),
                         title: Text("${rideData['from']} ➝ ${rideData['to']}"),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -219,9 +217,7 @@ class _YourRidesPageState extends State<YourRidesPage> {
                             Text("Seats: ${rideData['seats']}"),
                             Text("Status: $status"),
                             Text("Posted by: $postedByName"),
-                            Text(
-                              "Accepted: ${_formatTimestamp(rideData['acceptedAt'])}",
-                            ),
+                            Text("Accepted: ${_formatTimestamp(rideData['acceptedAt'])}"),
                           ],
                         ),
                         trailing: IconButton(
@@ -231,8 +227,7 @@ class _YourRidesPageState extends State<YourRidesPage> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) =>
-                                    ChatPage(rideId: rides[index].id),
+                                builder: (_) => ChatPage(rideId: rides[index].id),
                               ),
                             );
                           },
