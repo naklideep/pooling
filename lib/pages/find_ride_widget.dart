@@ -20,8 +20,9 @@ class _FindRideWidgetState extends State<FindRideWidget> {
   @override
   void initState() {
     super.initState();
-    // Periodically refresh the list to update countdowns
-    _timer = Timer.periodic(const Duration(seconds: 30), (_) {
+    // Periodically refresh to handle countdown & seat checks
+    _timer = Timer.periodic(const Duration(seconds: 30), (_) async {
+      await _autoUpdateRideStatus();
       if (mounted) setState(() {});
     });
   }
@@ -30,6 +31,30 @@ class _FindRideWidgetState extends State<FindRideWidget> {
   void dispose() {
     _timer?.cancel();
     super.dispose();
+  }
+
+  /// Auto update rides: mark expired or completed
+  Future<void> _autoUpdateRideStatus() async {
+    final now = DateTime.now();
+    final snapshot = await FirebaseFirestore.instance.collection('rides').get();
+    for (var doc in snapshot.docs) {
+      final data = doc.data();
+      final status = data['status'];
+      final ts = data['timestamp'] as Timestamp?;
+      final remaining = (data['remainingSeats'] ?? data['seats'] ?? 0) as int;
+
+      // Expire rides older than 12 hours
+      if (ts != null && now.difference(ts.toDate()).inHours >= 12 && status != 'expired') {
+        await doc.reference.update({'status': 'expired'});
+      }
+
+
+      // Mark as accepted (fully booked), NOT completed
+      if (remaining <= 0 && status == 'pending') {
+        await doc.reference.update({'status': 'accepted'});
+      }
+
+    }
   }
 
   String _formatDuration(Duration duration) {
@@ -73,21 +98,11 @@ class _FindRideWidgetState extends State<FindRideWidget> {
 
               final rides = snapshot.data!.docs.where((rideSnap) {
                 final ride = rideSnap.data() as Map<String, dynamic>;
+                final status = ride['status'];
 
-                // Skip cancelled or expired rides
-                if (ride['status'] == 'cancelled' || ride['status'] == 'expired') return false;
-
-                // Automatically expire rides older than 12 hours
-                final ts = ride['timestamp'] as Timestamp?;
-                if (ts != null) {
-                  final age = DateTime.now().difference(ts.toDate());
-                  if (age.inHours >= 12) {
-                    FirebaseFirestore.instance
-                        .collection('rides')
-                        .doc(rideSnap.id)
-                        .update({'status': 'expired'});
-                    return false;
-                  }
+                // Skip rides that should be hidden
+                if (status == 'cancelled' || status == 'expired' || status == 'completed') {
+                  return false;
                 }
 
                 // Skip rides already accepted by current user
@@ -110,7 +125,6 @@ class _FindRideWidgetState extends State<FindRideWidget> {
                 itemBuilder: (context, index) {
                   final rideSnap = rides[index];
                   final rideData = rideSnap.data() as Map<String, dynamic>;
-                  final status = rideData['status'] ?? 'pending';
                   final from = rideData['from'] ?? "N/A";
                   final to = rideData['to'] ?? "N/A";
                   final remainingSeats =
@@ -124,8 +138,7 @@ class _FindRideWidgetState extends State<FindRideWidget> {
                   final ts = rideData['timestamp'] as Timestamp?;
                   final timeLeft = ts != null
                       ? _formatDuration(
-                      (ts.toDate().add(const Duration(hours: 12))).difference(DateTime.now())
-                  )
+                      (ts.toDate().add(const Duration(hours: 12))).difference(DateTime.now()))
                       : 'N/A';
 
                   return Card(
@@ -136,7 +149,8 @@ class _FindRideWidgetState extends State<FindRideWidget> {
                       padding: const EdgeInsets.symmetric(vertical: 10),
                       child: ListTile(
                         leading: const Icon(Icons.directions_car, color: Colors.blue, size: 40),
-                        title: Text("$from ➝ $to", style: const TextStyle(fontWeight: FontWeight.bold)),
+                        title: Text("$from ➝ $to",
+                            style: const TextStyle(fontWeight: FontWeight.bold)),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -157,7 +171,7 @@ class _FindRideWidgetState extends State<FindRideWidget> {
                               icon: const Icon(Icons.info_outline, color: Colors.blue),
                               onPressed: () => _showRideDetails(rideData),
                             ),
-                            _buildTrailing(context, rideSnap.id, rideData, status, riderName),
+                            _buildTrailing(context, rideSnap.id, rideData),
                           ],
                         ),
                       ),
@@ -181,7 +195,8 @@ class _FindRideWidgetState extends State<FindRideWidget> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("🚗 Ride Details", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            const Text("🚗 Ride Details",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
             const SizedBox(height: 8),
             Text("From: ${rideData['from']}"),
             Text("To: ${rideData['to']}"),
@@ -200,14 +215,14 @@ class _FindRideWidgetState extends State<FindRideWidget> {
     );
   }
 
-  Widget _buildTrailing(BuildContext context, String rideId,
-      Map<String, dynamic> rideData, String status, String riderName) {
+  Widget _buildTrailing(BuildContext context, String rideId, Map<String, dynamic> rideData) {
     final currentUser = FirebaseAuth.instance.currentUser;
     final currentUserId = currentUser?.uid ?? "";
     final currentUserName =
         currentUser?.displayName ?? currentUser?.email?.split('@').first ?? "User";
 
     final remaining = ((rideData['remainingSeats'] ?? rideData['seats'] ?? 0) as num).toInt();
+
     if (rideData['riderId'] == currentUserId) {
       return ElevatedButton(
         style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
@@ -225,7 +240,8 @@ class _FindRideWidgetState extends State<FindRideWidget> {
               final snapshot = await txn.get(docRef);
               if (!snapshot.exists) throw Exception("Ride no longer exists");
               final data = snapshot.data() as Map<String, dynamic>;
-              int remainingSeatsNow = ((data['remainingSeats'] ?? data['seats'] ?? 1) as num).toInt();
+              int remainingSeatsNow =
+              ((data['remainingSeats'] ?? data['seats'] ?? 1) as num).toInt();
               final allowMultiple = data['allowMultiple'] ?? false;
 
               if (remainingSeatsNow <= 0) throw Exception("No seats left");
@@ -236,8 +252,12 @@ class _FindRideWidgetState extends State<FindRideWidget> {
                 'acceptedAt': FieldValue.serverTimestamp(),
               };
 
-              if (!allowMultiple || remainingSeatsNow == 0) {
+              // If all seats filled, mark as accepted
+              if (remainingSeatsNow <= 0) {
                 updates['status'] = 'accepted';
+              }
+
+              if (!allowMultiple) {
                 updates['acceptedBy'] = currentUserId;
                 updates['acceptedByName'] = currentUserName;
               } else {
@@ -285,7 +305,10 @@ class _FindRideWidgetState extends State<FindRideWidget> {
 
   Future<void> _cancelRide(BuildContext context, String rideId) async {
     try {
-      await FirebaseFirestore.instance.collection('rides').doc(rideId).update({'status': 'cancelled'});
+      await FirebaseFirestore.instance
+          .collection('rides')
+          .doc(rideId)
+          .update({'status': 'cancelled'});
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text("Ride cancelled successfully ❌")));
     } catch (e) {
