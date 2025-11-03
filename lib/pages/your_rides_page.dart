@@ -77,25 +77,42 @@ class _YourRidesPageState extends State<YourRidesPage> {
     return DateFormat('dd MMM yyyy, hh:mm a').format(date);
   }
 
-  /// 🧩 Mark ride completed for either poster or accepter
+  /// ✅ Mark ride completed for poster or accepter with confirmation
   Future<void> _markRideCompleted(String rideId, bool isPoster) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Confirm Ride Completion"),
+        content: const Text(
+            "Are you sure you want to mark this ride as completed?"),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("No")),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("Yes")),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
     final rideRef = FirebaseFirestore.instance.collection('rides').doc(rideId);
     final doc = await rideRef.get();
     final data = doc.data();
-
     if (data == null) return;
 
     final posterCompleted = data['posterCompleted'] ?? false;
     final accepterCompleted = data['accepterCompleted'] ?? false;
 
-    // Update respective field
-    if (isPoster) {
-      await rideRef.update({'posterCompleted': true});
-    } else {
-      await rideRef.update({'accepterCompleted': true});
+    if ((isPoster && posterCompleted) || (!isPoster && accepterCompleted)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("You've already marked this ride as completed.")),
+      );
+      return;
     }
 
-    // Re-fetch after update to check both sides
+    await rideRef.update({
+      isPoster ? 'posterCompleted' : 'accepterCompleted': true,
+    });
+
     final updatedDoc = await rideRef.get();
     final updated = updatedDoc.data();
     if (updated == null) return;
@@ -108,6 +125,13 @@ class _YourRidesPageState extends State<YourRidesPage> {
         'status': 'completed',
         'completedAt': FieldValue.serverTimestamp(),
       });
+      await _showNotification("✅ Ride successfully completed by both!");
+    } else {
+      await _showNotification(
+        isPoster
+            ? "Poster marked the ride as complete. Waiting for accepter..."
+            : "Accepter marked the ride as complete. Waiting for poster...",
+      );
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -123,13 +147,70 @@ class _YourRidesPageState extends State<YourRidesPage> {
     );
   }
 
-  /// ❌ Cancel ride (for pending rides)
-  Future<void> _cancelRide(String rideId) async {
+  /// ❌ Two-way cancel system (Poster & Accepter must both confirm)
+  Future<void> _cancelRide(String rideId, bool isPoster) async {
     final rideRef = FirebaseFirestore.instance.collection('rides').doc(rideId);
-    await rideRef.update({'status': 'cancelled'});
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("🚫 Ride cancelled successfully!")),
+    final doc = await rideRef.get();
+    final data = doc.data();
+    if (data == null) return;
+
+    final posterCancelled = data['posterCancelled'] ?? false;
+    final accepterCancelled = data['accepterCancelled'] ?? false;
+
+    if ((isPoster && posterCancelled) || (!isPoster && accepterCancelled)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("You've already marked this ride as cancelled.")),
+      );
+      return;
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Cancel Ride?"),
+        content: Text(isPoster
+            ? "You're about to cancel this ride. The accepter must also confirm to fully cancel it."
+            : "You're about to cancel your participation. The poster must also confirm to fully cancel it."),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("No")),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("Yes")),
+        ],
+      ),
     );
+
+    if (confirm != true) return;
+
+    await rideRef.update({
+      isPoster ? 'posterCancelled' : 'accepterCancelled': true,
+    });
+
+    final updatedDoc = await rideRef.get();
+    final updated = updatedDoc.data();
+    if (updated == null) return;
+
+    final posterNow = updated['posterCancelled'] ?? false;
+    final accepterNow = updated['accepterCancelled'] ?? false;
+
+    if (posterNow && accepterNow) {
+      await rideRef.update({
+        'status': 'cancelled',
+        'cancelledAt': FieldValue.serverTimestamp(),
+      });
+      await _showNotification("🚫 Ride fully cancelled by both.");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("🚫 Ride fully cancelled by both.")),
+      );
+    } else {
+      await _showNotification(isPoster
+          ? "Poster cancelled. Waiting for accepter to confirm."
+          : "Accepter cancelled. Waiting for poster to confirm.");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(isPoster
+                ? "You cancelled. Waiting for accepter..."
+                : "You cancelled. Waiting for poster...")),
+      );
+    }
   }
 
   @override
@@ -172,25 +253,27 @@ class _YourRidesPageState extends State<YourRidesPage> {
                         rides[index].data() as Map<String, dynamic>? ?? {};
                     final status = rideData['status'] ?? 'pending';
                     final acceptedByName = rideData['acceptedByName'] ?? '';
-                    final posterCompleted =
-                        rideData['posterCompleted'] ?? false;
-                    final accepterCompleted =
-                        rideData['accepterCompleted'] ?? false;
+                    final posterCompleted = rideData['posterCompleted'] ?? false;
+                    final accepterCompleted = rideData['accepterCompleted'] ?? false;
+                    final posterCancelled = rideData['posterCancelled'] ?? false;
+                    final accepterCancelled = rideData['accepterCancelled'] ?? false;
 
                     return Card(
                       margin: const EdgeInsets.all(10),
+                      color: status == "completed"
+                          ? Colors.green.shade50
+                          : status == "cancelled"
+                          ? Colors.red.shade50
+                          : Colors.white,
                       child: ListTile(
-                        leading: const Icon(Icons.directions_car,
-                            color: Colors.blue),
+                        leading: const Icon(Icons.directions_car, color: Colors.blue),
                         title: Text("${rideData['from']} ➝ ${rideData['to']}"),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text("Seats: ${rideData['seats']}"),
                             Text("Status: $status"),
-                            Text(
-                              "Posted: ${_formatTimestamp(rideData['timestamp'])}",
-                            ),
+                            Text("Posted: ${_formatTimestamp(rideData['timestamp'])}"),
                             if (acceptedByName.isNotEmpty)
                               Text("Accepted by: $acceptedByName"),
                             if (posterCompleted || accepterCompleted)
@@ -198,48 +281,38 @@ class _YourRidesPageState extends State<YourRidesPage> {
                                 "Completion: ${posterCompleted ? 'Poster ✅' : 'Poster ❌'} | ${accepterCompleted ? 'Accepter ✅' : 'Accepter ❌'}",
                                 style: const TextStyle(fontSize: 12),
                               ),
+                            if (posterCancelled || accepterCancelled)
+                              Text(
+                                "Cancel: ${posterCancelled ? 'Poster ❌' : 'Poster ✅'} | ${accepterCancelled ? 'Accepter ❌' : 'Accepter ✅'}",
+                                style: const TextStyle(fontSize: 12, color: Colors.redAccent),
+                              ),
                           ],
                         ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            // 🟠 Cancel for pending rides
-                            if (status == "pending")
+                            if (status == "pending" || status == "accepted")
                               IconButton(
-                                icon: const Icon(Icons.cancel,
-                                    color: Colors.redAccent),
+                                icon: const Icon(Icons.cancel, color: Colors.redAccent),
                                 tooltip: "Cancel Ride",
                                 onPressed: () async {
-                                  final confirm = await showDialog<bool>(
-                                    context: context,
-                                    builder: (ctx) => AlertDialog(
-                                      title: const Text("Cancel Ride?"),
-                                      content: const Text(
-                                          "Are you sure you want to cancel this ride?"),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () =>
-                                              Navigator.pop(ctx, false),
-                                          child: const Text("No"),
-                                        ),
-                                        TextButton(
-                                          onPressed: () =>
-                                              Navigator.pop(ctx, true),
-                                          child: const Text("Yes"),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                  if (confirm == true) {
-                                    await _cancelRide(rides[index].id);
-                                  }
+                                  await _cancelRide(rides[index].id, true);
                                 },
                               ),
-                            if (status == "accepted" || status == "completed")
+                            if ((status == "accepted" || status == "completed") &&
+                                !posterCompleted)
                               IconButton(
-                                icon:
-                                const Icon(Icons.chat, color: Colors.blue),
-                                tooltip: "Chat",
+                                icon: const Icon(Icons.done, color: Colors.orange),
+                                tooltip: "Mark as Completed",
+                                onPressed: () async {
+                                  await _markRideCompleted(rides[index].id, true);
+                                },
+                              ),
+                            if (status == "completed")
+                              const Icon(Icons.check_circle, color: Colors.green),
+                            if (status == "accepted")
+                              IconButton(
+                                icon: const Icon(Icons.chat, color: Colors.blue),
                                 onPressed: () {
                                   Navigator.push(
                                     context,
@@ -248,16 +321,6 @@ class _YourRidesPageState extends State<YourRidesPage> {
                                           ChatPage(rideId: rides[index].id),
                                     ),
                                   );
-                                },
-                              ),
-                            if (status == "accepted" && !posterCompleted)
-                              IconButton(
-                                icon: const Icon(Icons.done,
-                                    color: Colors.orange),
-                                tooltip: "Mark as Completed",
-                                onPressed: () async {
-                                  await _markRideCompleted(
-                                      rides[index].id, true);
                                 },
                               ),
                           ],
@@ -273,20 +336,32 @@ class _YourRidesPageState extends State<YourRidesPage> {
             StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
                   .collection("rides")
-                  .where('acceptedBy', isEqualTo: widget.userId)
-                  .where('status',
-                  whereIn: ['accepted', 'completed', 'expired'])
-                  .orderBy("acceptedAt", descending: true)
+                  .where('status', whereIn: [
+                'pending',
+                'accepted',
+                'completed',
+                'cancelled',
+                'expired'
+              ])
+                  .orderBy("timestamp", descending: true)
                   .snapshots(),
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
+                if (!snapshot.hasData) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+
+                final rides = snapshot.data!.docs.where((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  final acceptedBy = data['acceptedBy'];
+                  final acceptedByList =
+                  List<String>.from(data['acceptedByList'] ?? []);
+                  return acceptedBy == widget.userId ||
+                      acceptedByList.contains(widget.userId);
+                }).toList();
+
+                if (rides.isEmpty) {
                   return const Center(child: Text("No accepted rides yet."));
                 }
-
-                final rides = snapshot.data!.docs;
 
                 return ListView.builder(
                   itemCount: rides.length,
@@ -300,12 +375,21 @@ class _YourRidesPageState extends State<YourRidesPage> {
                         rideData['posterCompleted'] ?? false;
                     final accepterCompleted =
                         rideData['accepterCompleted'] ?? false;
+                    final posterCancelled =
+                        rideData['posterCancelled'] ?? false;
+                    final accepterCancelled =
+                        rideData['accepterCancelled'] ?? false;
 
                     return Card(
                       margin: const EdgeInsets.all(10),
+                      color: status == "completed"
+                          ? Colors.green.shade50
+                          : status == "cancelled"
+                          ? Colors.red.shade50
+                          : Colors.white,
                       child: ListTile(
-                        leading: const Icon(Icons.directions_car,
-                            color: Colors.green),
+                        leading:
+                        const Icon(Icons.directions_car, color: Colors.green),
                         title: Text("${rideData['from']} ➝ ${rideData['to']}"),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -313,12 +397,15 @@ class _YourRidesPageState extends State<YourRidesPage> {
                             Text("Seats: ${rideData['seats']}"),
                             Text("Status: $status"),
                             Text("Posted by: $postedByName"),
-                            Text(
-                                "Accepted: ${_formatTimestamp(rideData['acceptedAt'])}"),
                             if (posterCompleted || accepterCompleted)
                               Text(
                                 "Completion: ${posterCompleted ? 'Poster ✅' : 'Poster ❌'} | ${accepterCompleted ? 'Accepter ✅' : 'Accepter ❌'}",
                                 style: const TextStyle(fontSize: 12),
+                              ),
+                            if (posterCancelled || accepterCancelled)
+                              Text(
+                                "Cancel: ${posterCancelled ? 'Poster ❌' : 'Poster ✅'} | ${accepterCancelled ? 'Accepter ❌' : 'Accepter ✅'}",
+                                style: const TextStyle(fontSize: 12, color: Colors.redAccent),
                               ),
                           ],
                         ),
@@ -332,22 +419,31 @@ class _YourRidesPageState extends State<YourRidesPage> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) => ChatPage(
-                                        rideId: rides[index].id),
+                                    builder: (_) =>
+                                        ChatPage(rideId: rides[index].id),
                                   ),
                                 );
                               },
                             ),
-                            if (status == "accepted" && !accepterCompleted)
+                            if ((status == "accepted" || status == "pending") &&
+                                !accepterCompleted)
                               IconButton(
-                                icon: const Icon(Icons.done,
-                                    color: Colors.orange),
+                                icon: const Icon(Icons.done, color: Colors.orange),
                                 tooltip: "Complete Ride",
                                 onPressed: () async {
-                                  await _markRideCompleted(
-                                      rides[index].id, false);
+                                  await _markRideCompleted(rides[index].id, false);
                                 },
                               ),
+                            if ((status == "accepted" || status == "pending"))
+                              IconButton(
+                                icon: const Icon(Icons.cancel, color: Colors.redAccent),
+                                tooltip: "Cancel Ride",
+                                onPressed: () async {
+                                  await _cancelRide(rides[index].id, false);
+                                },
+                              ),
+                            if (status == "completed")
+                              const Icon(Icons.check_circle, color: Colors.green),
                           ],
                         ),
                       ),
