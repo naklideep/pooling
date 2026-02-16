@@ -17,6 +17,7 @@ class _FindRideWidgetState extends State<FindRideWidget> {
   String? _searchQ;
   Timer? _timer;
 
+
   @override
   void initState() {
     super.initState();
