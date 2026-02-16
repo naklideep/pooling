@@ -492,34 +492,48 @@ class _PostRidePageState extends State<PostRidePage> {
                   child: Text(type),
                 ))
                     .toList(),
-                onChanged: (v) => setState(() => _selectedRideType = v),
+                onChanged: (v) {
+                  setState(() {
+                    _selectedRideType = v;
+
+                    if (v == "Bike") {
+                      _seatsController.text = "1"; // Bike always 1 seat
+                    } else if (v == "Car") {
+                      if (_seatsController.text.isEmpty || _seatsController.text == "1") {
+                        _seatsController.text = "4"; // default for car
+                      }
+                    }
+                  });
+                },
+
               ),
               const SizedBox(height: 12),
 
               // Available seats
               TextFormField(
                 controller: _seatsController,
-                decoration: const InputDecoration(
+                enabled: _selectedRideType == "Car", // disable when Bike
+                decoration: InputDecoration(
                   labelText: "Available Seats",
-                  prefixIcon: Icon(Icons.event_seat),
-                  border: OutlineInputBorder(),
-                  hintText: "e.g., 4",
+                  prefixIcon: const Icon(Icons.event_seat),
+                  border: const OutlineInputBorder(),
+                  hintText: _selectedRideType == "Bike" ? "1 (fixed)" : "Max 6",
                 ),
                 keyboardType: TextInputType.number,
                 validator: (v) {
+                  if (_selectedRideType == "Bike") return null; // auto-valid
+
                   if (v == null || v.isEmpty) return "Enter number of seats";
                   final seats = int.tryParse(v);
                   if (seats == null || seats < 1) return "Enter valid number";
-                  if (seats > 10) return "Maximum 10 seats allowed";
+                  if (seats > 6) return "Maximum 6 seats allowed for Car";
                   return null;
                 },
                 onChanged: (_) {
-                  // Recalculate cost when seats change
-                  if (_distanceKm != null) {
-                    setState(() {});
-                  }
+                  if (_distanceKm != null) setState(() {});
                 },
               ),
+
               const SizedBox(height: 12),
 
               // Allow multiple passengers switch

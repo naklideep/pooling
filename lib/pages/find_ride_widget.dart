@@ -20,7 +20,6 @@ class _FindRideWidgetState extends State<FindRideWidget> {
   @override
   void initState() {
     super.initState();
-    // Periodically refresh to handle countdown & seat checks
     _timer = Timer.periodic(const Duration(seconds: 30), (_) async {
       await _autoUpdateRideStatus();
       if (mounted) setState(() {});
@@ -33,27 +32,23 @@ class _FindRideWidgetState extends State<FindRideWidget> {
     super.dispose();
   }
 
-  /// Auto update rides: mark expired or completed
   Future<void> _autoUpdateRideStatus() async {
     final now = DateTime.now();
     final snapshot = await FirebaseFirestore.instance.collection('rides').get();
+
     for (var doc in snapshot.docs) {
       final data = doc.data();
       final status = data['status'];
       final ts = data['timestamp'] as Timestamp?;
       final remaining = (data['remainingSeats'] ?? data['seats'] ?? 0) as int;
 
-      // Expire rides older than 12 hours
       if (ts != null && now.difference(ts.toDate()).inHours >= 12 && status != 'expired') {
         await doc.reference.update({'status': 'expired'});
       }
 
-
-      // Mark as accepted (fully booked), NOT completed
       if (remaining <= 0 && status == 'pending') {
         await doc.reference.update({'status': 'accepted'});
       }
-
     }
   }
 
@@ -70,7 +65,6 @@ class _FindRideWidgetState extends State<FindRideWidget> {
 
     return Column(
       children: [
-        // Search bar
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8),
           child: TextField(
@@ -84,7 +78,6 @@ class _FindRideWidgetState extends State<FindRideWidget> {
           ),
         ),
 
-        // Ride list
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance
@@ -100,19 +93,18 @@ class _FindRideWidgetState extends State<FindRideWidget> {
                 final ride = rideSnap.data() as Map<String, dynamic>;
                 final status = ride['status'];
 
-                // Skip rides that should be hidden
                 if (status == 'cancelled' || status == 'expired' || status == 'completed') {
                   return false;
                 }
 
-                // Skip rides already accepted by current user
                 final acceptedByList = List.from(ride['acceptedByList'] ?? []);
                 if (acceptedByList.contains(currentUserId)) return false;
 
-                // Search filter
                 if (_searchQ == null || _searchQ!.isEmpty) return true;
+
                 final to = (ride['to'] ?? '').toString().toLowerCase();
                 final poster = (ride['postedByName'] ?? '').toString().toLowerCase();
+
                 return to.contains(_searchQ!) || poster.contains(_searchQ!);
               }).toList();
 
@@ -125,20 +117,25 @@ class _FindRideWidgetState extends State<FindRideWidget> {
                 itemBuilder: (context, index) {
                   final rideSnap = rides[index];
                   final rideData = rideSnap.data() as Map<String, dynamic>;
+
                   final from = rideData['from'] ?? "N/A";
                   final to = rideData['to'] ?? "N/A";
+
                   final remainingSeats =
                   (rideData['remainingSeats'] ?? rideData['seats'] ?? 0).toString();
-                  final riderName = (rideData['postedByName']?.toString().trim().isNotEmpty ?? false)
+
+                  final riderName =
+                  (rideData['postedByName']?.toString().trim().isNotEmpty ?? false)
                       ? rideData['postedByName']
                       : "Unknown";
+
                   final cost = rideData['estimatedCost'] ?? 'N/A';
 
-                  // Time left until 12h expiry
                   final ts = rideData['timestamp'] as Timestamp?;
                   final timeLeft = ts != null
                       ? _formatDuration(
-                      (ts.toDate().add(const Duration(hours: 12))).difference(DateTime.now()))
+                      (ts.toDate().add(const Duration(hours: 12)))
+                          .difference(DateTime.now()))
                       : 'N/A';
 
                   return Card(
@@ -146,34 +143,92 @@ class _FindRideWidgetState extends State<FindRideWidget> {
                     margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      child: ListTile(
-                        leading: const Icon(Icons.directions_car, color: Colors.blue, size: 40),
-                        title: Text("$from ➝ $to",
-                            style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 6),
-                            Text("Seats: $remainingSeats"),
-                            const SizedBox(height: 4),
-                            Text("Posted by: $riderName"),
-                            const SizedBox(height: 4),
-                            Text("💰 Cost: ₹$cost"),
-                            const SizedBox(height: 4),
-                            Text("⏱ $timeLeft", style: const TextStyle(color: Colors.red)),
-                          ],
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.info_outline, color: Colors.blue),
-                              onPressed: () => _showRideDetails(rideData),
-                            ),
-                            _buildTrailing(context, rideSnap.id, rideData),
-                          ],
-                        ),
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // ROUTE SECTION
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(Icons.location_on,
+                                  color: Colors.red, size: 22),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  from,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          Row(
+                            children: [
+                              const Padding(
+                                padding: EdgeInsets.only(left: 3),
+                                child: Icon(Icons.arrow_downward,
+                                    size: 18, color: Colors.grey),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  to,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text("Seats: $remainingSeats"),
+                              Text("💰 ₹$cost"),
+                            ],
+                          ),
+
+                          const SizedBox(height: 4),
+
+                          Text(
+                            "Posted by: $riderName",
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+
+                          const SizedBox(height: 4),
+
+                          Text(
+                            "⏱ $timeLeft",
+                            style: const TextStyle(color: Colors.red),
+                          ),
+
+                          const SizedBox(height: 10),
+
+                          // ACTION BUTTONS
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.info_outline, color: Colors.blue),
+                                onPressed: () => _showRideDetails(rideData),
+                              ),
+                              _buildTrailing(context, rideSnap.id, rideData),
+                            ],
+                          )
+                        ],
                       ),
                     ),
                   );
@@ -187,10 +242,15 @@ class _FindRideWidgetState extends State<FindRideWidget> {
   }
 
   void _showRideDetails(Map<String, dynamic> rideData) {
+    String clean(v) {
+      if (v is Map && v.containsKey("address")) return v["address"];
+      return v.toString();
+    }
+
     showModalBottomSheet(
       context: context,
       builder: (_) => Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -198,10 +258,10 @@ class _FindRideWidgetState extends State<FindRideWidget> {
             const Text("🚗 Ride Details",
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
             const SizedBox(height: 8),
-            Text("From: ${rideData['from']}"),
-            Text("To: ${rideData['to']}"),
+            Text("From: ${clean(rideData['from'])}"),
+            Text("To: ${clean(rideData['to'])}"),
             Text(
-                "Date & Time: ${rideData['dateTime'] != null ? (rideData['dateTime'] as Timestamp).toDate().toString() : 'N/A'}"),
+                "Date & Time: ${rideData['dateTime'] != null ? (rideData['dateTime'] as Timestamp).toDate() : 'N/A'}"),
             Text("Seats Available: ${rideData['remainingSeats'] ?? rideData['seats']}"),
             Text("Ride Type: ${rideData['rideType']}"),
             Text("Allow Multiple: ${rideData['allowMultiple'] ? 'Yes' : 'No'}"),
@@ -221,7 +281,8 @@ class _FindRideWidgetState extends State<FindRideWidget> {
     final currentUserName =
         currentUser?.displayName ?? currentUser?.email?.split('@').first ?? "User";
 
-    final remaining = ((rideData['remainingSeats'] ?? rideData['seats'] ?? 0) as num).toInt();
+    final remaining =
+    ((rideData['remainingSeats'] ?? rideData['seats'] ?? 0) as num).toInt();
 
     if (rideData['riderId'] == currentUserId) {
       return ElevatedButton(
@@ -235,10 +296,12 @@ class _FindRideWidgetState extends State<FindRideWidget> {
       return ElevatedButton(
         onPressed: () async {
           final docRef = FirebaseFirestore.instance.collection('rides').doc(rideId);
+
           try {
             await FirebaseFirestore.instance.runTransaction((txn) async {
               final snapshot = await txn.get(docRef);
               if (!snapshot.exists) throw Exception("Ride no longer exists");
+
               final data = snapshot.data() as Map<String, dynamic>;
               int remainingSeatsNow =
               ((data['remainingSeats'] ?? data['seats'] ?? 1) as num).toInt();
@@ -246,13 +309,13 @@ class _FindRideWidgetState extends State<FindRideWidget> {
 
               if (remainingSeatsNow <= 0) throw Exception("No seats left");
 
-              remainingSeatsNow -= 1;
+              remainingSeatsNow--;
+
               final updates = <String, dynamic>{
                 'remainingSeats': remainingSeatsNow,
                 'acceptedAt': FieldValue.serverTimestamp(),
               };
 
-              // If all seats filled, mark as accepted
               if (remainingSeatsNow <= 0) {
                 updates['status'] = 'accepted';
               }
@@ -262,7 +325,9 @@ class _FindRideWidgetState extends State<FindRideWidget> {
                 updates['acceptedByName'] = currentUserName;
               } else {
                 final acceptedByList = List.from(data['acceptedByList'] ?? []);
-                if (!acceptedByList.contains(currentUserId)) acceptedByList.add(currentUserId);
+                if (!acceptedByList.contains(currentUserId)) {
+                  acceptedByList.add(currentUserId);
+                }
                 updates['acceptedByList'] = acceptedByList;
               }
 
@@ -271,8 +336,10 @@ class _FindRideWidgetState extends State<FindRideWidget> {
 
             ScaffoldMessenger.of(context)
                 .showSnackBar(const SnackBar(content: Text("Ride accepted successfully ✅")));
+
             Navigator.push(
                 context, MaterialPageRoute(builder: (_) => ChatPage(rideId: rideId)));
+
           } catch (e) {
             ScaffoldMessenger.of(context)
                 .showSnackBar(SnackBar(content: Text("Error accepting ride: $e")));
@@ -309,11 +376,13 @@ class _FindRideWidgetState extends State<FindRideWidget> {
           .collection('rides')
           .doc(rideId)
           .update({'status': 'cancelled'});
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text("Ride cancelled successfully ❌")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Ride cancelled successfully ❌")),
+      );
     } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text("Failed to cancel ride: $e")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to cancel ride: $e")),
+      );
     }
   }
 }

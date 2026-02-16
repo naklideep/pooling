@@ -497,12 +497,30 @@ class _YourRidesPageState extends State<YourRidesPage> {
                               spacing: 4,
                               runSpacing: 4,
                               children: [
+                                // TRACK
                                 if (['accepted', 'tracking', 'in_progress'].contains(status) || hasAnyAcceptances)
                                   OutlinedButton.icon(
                                     icon: const Icon(Icons.map, size: 16),
                                     label: const Text("Track", style: TextStyle(fontSize: 12)),
                                     onPressed: () => _openTrackingPage(rideData, rideId, true),
                                   ),
+
+                                // CHAT
+                                if (hasAnyAcceptances || ['accepted', 'tracking', 'in_progress'].contains(status))
+                                  OutlinedButton.icon(
+                                    icon: const Icon(Icons.chat, size: 16),
+                                    label: const Text("Chat", style: TextStyle(fontSize: 12)),
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => ChatPage(rideId: rideId),
+                                        ),
+                                      );
+                                    },
+                                  ),
+
+                                // CANCEL
                                 if (['pending', 'accepted', 'tracking'].contains(status))
                                   OutlinedButton.icon(
                                     icon: const Icon(Icons.cancel, size: 16),
@@ -510,6 +528,8 @@ class _YourRidesPageState extends State<YourRidesPage> {
                                     style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
                                     onPressed: () => _cancelRide(rideId, true),
                                   ),
+
+                                // DONE
                                 if (['accepted', 'tracking'].contains(status))
                                   OutlinedButton.icon(
                                     icon: const Icon(Icons.check_circle, size: 16),
@@ -518,7 +538,8 @@ class _YourRidesPageState extends State<YourRidesPage> {
                                     onPressed: () => _markRideCompleted(rideId, true),
                                   ),
                               ],
-                            ),
+                            )
+
                           ],
                         ),
                       ),
@@ -549,19 +570,30 @@ class _YourRidesPageState extends State<YourRidesPage> {
 
                 final rides = snapshot.data!.docs.where((doc) {
                   final data = doc.data() as Map<String, dynamic>;
-                  final status = (data['status'] ?? '').toString();
 
-                  if (!['pending', 'accepted', 'completed', 'cancelled', 'tracking', 'in_progress'].contains(status)) {
+                  // ONLY accepted statuses allowed
+                  final status = (data['status'] ?? '').toString();
+                  if (![
+                    'pending',
+                    'accepted',
+                    'tracking',
+                    'in_progress',
+                    'completed',
+                    'cancelled'
+                  ].contains(status)) {
                     return false;
                   }
 
+                  final riderId = widget.userId;
+
+                  // CHECK ONLY FOR ACCEPTED USER
                   final acceptedBy = data['acceptedBy'];
                   final acceptedByList = List<String>.from(data['acceptedByList'] ?? []);
-                  final riderId = widget.userId;
-                  final isRider = acceptedBy == riderId || acceptedByList.contains(riderId);
-                  final isPoster = data['riderId'] == riderId;
 
-                  return isRider || isPoster;
+                  final isRider =
+                      acceptedBy == riderId || acceptedByList.contains(riderId);
+
+                  return isRider; // 👈 FIX — Do NOT include posted rides
                 }).toList();
 
                 if (rides.isEmpty) {
@@ -626,6 +658,7 @@ class _YourRidesPageState extends State<YourRidesPage> {
                               ],
                             ),
                             const SizedBox(height: 8),
+
                             Row(
                               children: [
                                 _buildStatusChip(status, rideData),
@@ -636,6 +669,7 @@ class _YourRidesPageState extends State<YourRidesPage> {
                                 ),
                               ],
                             ),
+
                             const SizedBox(height: 4),
                             Text(
                               "Driver: $postedByName",
@@ -649,18 +683,25 @@ class _YourRidesPageState extends State<YourRidesPage> {
                               "Departure: ${_formatDateTime(rideData['dateTime'])}",
                               style: const TextStyle(fontSize: 12, color: Colors.grey),
                             ),
+
                             const SizedBox(height: 8),
+
                             Wrap(
                               spacing: 4,
                               runSpacing: 4,
                               children: [
-                                if (['accepted', 'tracking', 'in_progress'].contains(status))
+                                if (['accepted', 'tracking', 'in_progress']
+                                    .contains(status))
                                   OutlinedButton.icon(
                                     icon: const Icon(Icons.map, size: 16),
                                     label: const Text("Track", style: TextStyle(fontSize: 12)),
-                                    onPressed: () => _openTrackingPage(rideData, rideId, false),
+                                    onPressed: () =>
+                                        _openTrackingPage(rideData, rideId, false),
                                   ),
-                                if (['accepted', 'pending'].contains(status))
+
+                                // FIXED: Chat button visible even in tracking/in_progress
+                                if (['accepted', 'pending', 'tracking', 'in_progress']
+                                    .contains(status))
                                   OutlinedButton.icon(
                                     icon: const Icon(Icons.chat, size: 16),
                                     label: const Text("Chat", style: TextStyle(fontSize: 12)),
@@ -673,18 +714,26 @@ class _YourRidesPageState extends State<YourRidesPage> {
                                       );
                                     },
                                   ),
+
                                 if (['accepted', 'pending'].contains(status))
                                   OutlinedButton.icon(
                                     icon: const Icon(Icons.cancel, size: 16),
-                                    label: const Text("Cancel", style: TextStyle(fontSize: 12)),
-                                    style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                                    label:
+                                    const Text("Cancel", style: TextStyle(fontSize: 12)),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: Colors.red,
+                                    ),
                                     onPressed: () => _cancelRide(rideId, false),
                                   ),
+
                                 if (['accepted', 'tracking'].contains(status))
                                   OutlinedButton.icon(
                                     icon: const Icon(Icons.check_circle, size: 16),
-                                    label: const Text("Done", style: TextStyle(fontSize: 12)),
-                                    style: OutlinedButton.styleFrom(foregroundColor: Colors.green),
+                                    label:
+                                    const Text("Done", style: TextStyle(fontSize: 12)),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: Colors.green,
+                                    ),
                                     onPressed: () => _markRideCompleted(rideId, false),
                                   ),
                               ],
