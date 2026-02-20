@@ -71,7 +71,10 @@ class _FindRideWidgetState extends State<FindRideWidget> {
           child: TextField(
             decoration: const InputDecoration(
               prefixIcon: Icon(Icons.search),
+
               hintText: 'Search destination or poster',
+              prefixIconColor: Colors.white,
+              hintStyle: TextStyle(color:Colors.white),
               border: OutlineInputBorder(),
               isDense: true,
             ),
@@ -174,7 +177,7 @@ class _FindRideWidgetState extends State<FindRideWidget> {
                               const Padding(
                                 padding: EdgeInsets.only(left: 3),
                                 child: Icon(Icons.arrow_downward,
-                                    size: 18, color: Colors.grey),
+                                    size: 18, color: Colors.white),
                               ),
                               const SizedBox(width: 6),
                               Expanded(

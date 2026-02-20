@@ -14,17 +14,44 @@ class YourRidesPage extends StatefulWidget {
   State<YourRidesPage> createState() => _YourRidesPageState();
 }
 
-class _YourRidesPageState extends State<YourRidesPage> {
+class _YourRidesPageState extends State<YourRidesPage>
+    with SingleTickerProviderStateMixin {
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
   FlutterLocalNotificationsPlugin();
 
   final Set<String> _notifiedRides = {};
+
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
 
   @override
   void initState() {
     super.initState();
     _initializeNotifications();
     _listenForAcceptedRides();
+
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
+    );
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOutCubic,
+    ));
+    _animationController.forward();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
   }
 
   Future<void> _initializeNotifications() async {
@@ -105,18 +132,65 @@ class _YourRidesPageState extends State<YourRidesPage> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("Confirm Ride Completion"),
-        content: const Text(
+        backgroundColor: const Color(0xFF1E3C72).withOpacity(0.95),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(
+            color: Colors.white.withOpacity(0.2),
+            width: 1,
+          ),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.check_circle_outline,
+                color: Colors.greenAccent,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              "Complete Ride?",
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
+          ],
+        ),
+        content: Text(
           "Are you sure you want to mark this ride as completed? "
               "Both parties must confirm for the ride to be fully completed.",
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.8),
+            fontSize: 15,
+            height: 1.5,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text("Cancel"),
+            child: const Text(
+              "Cancel",
+              style: TextStyle(color: Colors.white70),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.greenAccent,
+              foregroundColor: const Color(0xFF1E3C72),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
             child: const Text("Yes, Complete"),
           ),
         ],
@@ -126,7 +200,8 @@ class _YourRidesPageState extends State<YourRidesPage> {
     if (confirm != true) return;
 
     try {
-      final rideRef = FirebaseFirestore.instance.collection('rides').doc(rideId);
+      final rideRef =
+      FirebaseFirestore.instance.collection('rides').doc(rideId);
       final doc = await rideRef.get();
 
       if (!doc.exists) {
@@ -174,7 +249,8 @@ class _YourRidesPageState extends State<YourRidesPage> {
 
   Future<void> _cancelRide(String rideId, bool isPoster) async {
     try {
-      final rideRef = FirebaseFirestore.instance.collection('rides').doc(rideId);
+      final rideRef =
+      FirebaseFirestore.instance.collection('rides').doc(rideId);
       final doc = await rideRef.get();
 
       if (!doc.exists) {
@@ -186,7 +262,8 @@ class _YourRidesPageState extends State<YourRidesPage> {
       final posterCancelled = data['posterCancelled'] ?? false;
       final accepterCancelled = data['accepterCancelled'] ?? false;
 
-      if ((isPoster && posterCancelled) || (!isPoster && accepterCancelled)) {
+      if ((isPoster && posterCancelled) ||
+          (!isPoster && accepterCancelled)) {
         _showInfo("You've already marked this ride as cancelled.");
         return;
       }
@@ -194,20 +271,66 @@ class _YourRidesPageState extends State<YourRidesPage> {
       final confirm = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text("Cancel Ride?"),
+          backgroundColor: const Color(0xFF1E3C72).withOpacity(0.95),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(
+              color: Colors.white.withOpacity(0.2),
+              width: 1,
+            ),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.warning_amber_rounded,
+                  color: Colors.redAccent,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                "Cancel Ride?",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+            ],
+          ),
           content: Text(
             isPoster
                 ? "You're about to cancel this ride. The accepter must also confirm to fully cancel it."
                 : "You're about to cancel your participation. The poster must also confirm to fully cancel it.",
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.8),
+              fontSize: 15,
+              height: 1.5,
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text("No"),
+              child: const Text(
+                "No",
+                style: TextStyle(color: Colors.white70),
+              ),
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
               child: const Text("Yes, Cancel"),
             ),
           ],
@@ -245,7 +368,8 @@ class _YourRidesPageState extends State<YourRidesPage> {
     }
   }
 
-  void _openTrackingPage(Map<String, dynamic> rideData, String rideId, bool isDriver) {
+  void _openTrackingPage(
+      Map<String, dynamic> rideData, String rideId, bool isDriver) {
     final startLat = _getDouble(rideData['from_lat']);
     final startLng = _getDouble(rideData['from_lng'], isLat: false);
     final destLat = _getDouble(rideData['to_lat']);
@@ -281,21 +405,66 @@ class _YourRidesPageState extends State<YourRidesPage> {
   void _showSuccess(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.green),
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle_outline, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(message, style: const TextStyle(fontSize: 15)),
+            ),
+          ],
+        ),
+        backgroundColor: const Color(0xFF43A047),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 3),
+      ),
     );
   }
 
   void _showError(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(message, style: const TextStyle(fontSize: 15)),
+            ),
+          ],
+        ),
+        backgroundColor: const Color(0xFFE53935),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 3),
+      ),
     );
   }
 
   void _showInfo(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.orange),
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.info_outline, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(message, style: const TextStyle(fontSize: 15)),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.orange,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 3),
+      ),
     );
   }
 
@@ -346,11 +515,11 @@ class _YourRidesPageState extends State<YourRidesPage> {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
+        color: color.withOpacity(0.15),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color),
+        border: Border.all(color: color.withOpacity(0.5), width: 1.5),
       ),
       child: Text(
         text,
@@ -358,6 +527,7 @@ class _YourRidesPageState extends State<YourRidesPage> {
           color: color,
           fontSize: 11,
           fontWeight: FontWeight.bold,
+          letterSpacing: 0.5,
         ),
       ),
     );
@@ -368,385 +538,785 @@ class _YourRidesPageState extends State<YourRidesPage> {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text("Your Rides"),
-          centerTitle: true,
-          bottom: const TabBar(
-            tabs: [
-              Tab(icon: Icon(Icons.post_add), text: "Posted Rides"),
-              Tab(icon: Icon(Icons.check_circle), text: "Accepted Rides"),
-            ],
-          ),
-        ),
-        body: TabBarView(
+        body: Stack(
           children: [
-            // ------------------ Posted Rides ------------------
-            StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection("rides")
-                  .where('riderId', isEqualTo: widget.userId)
-                  .orderBy("timestamp", descending: true)
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                if (snapshot.hasError) {
-                  return Center(child: Text("Error: ${snapshot.error}"));
-                }
-
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.directions_car_outlined, size: 80, color: Colors.grey),
-                        SizedBox(height: 16),
-                        Text("No posted rides yet."),
-                        Text("Tap + to post a ride!", style: TextStyle(color: Colors.grey)),
-                      ],
-                    ),
-                  );
-                }
-
-                final rides = snapshot.data!.docs;
-
-                return ListView.builder(
-                  padding: const EdgeInsets.all(8),
-                  itemCount: rides.length,
-                  itemBuilder: (context, index) {
-                    final rideData = rides[index].data() as Map<String, dynamic>? ?? {};
-                    final status = (rideData['status'] ?? 'pending').toString();
-                    final rideId = rides[index].id;
-
-                    final acceptedBy = rideData['acceptedBy'];
-                    final acceptedByList = List<String>.from(rideData['acceptedByList'] ?? []);
-                    final hasAnyAcceptances = acceptedBy != null || acceptedByList.isNotEmpty;
-
-                    final totalSeats = rideData['seats'] ?? 0;
-                    final remainingSeats = rideData['remainingSeats'] ?? totalSeats;
-
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      elevation: 2,
-                      color: status == "completed"
-                          ? Colors.green.shade50
-                          : status == "cancelled"
-                          ? Colors.red.shade50
-                          : Colors.white,
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.trip_origin, color: Colors.green, size: 20),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    rideData['from'] ?? 'Unknown',
-                                    style: const TextStyle(fontWeight: FontWeight.w500),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                const Icon(Icons.location_on, color: Colors.red, size: 20),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    rideData['to'] ?? 'Unknown',
-                                    style: const TextStyle(fontWeight: FontWeight.w500),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                _buildStatusChip(status, rideData),
-                                const SizedBox(width: 8),
-                                Text(
-                                  "Seats: $remainingSeats/$totalSeats available",
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              "Departure: ${_formatDateTime(rideData['dateTime'])}",
-                              style: const TextStyle(fontSize: 12, color: Colors.grey),
-                            ),
-                            if (hasAnyAcceptances) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                "✓ ${acceptedByList.length + (acceptedBy != null ? 1 : 0)} accepted",
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.green,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 4,
-                              runSpacing: 4,
-                              children: [
-                                // TRACK
-                                if (['accepted', 'tracking', 'in_progress'].contains(status) || hasAnyAcceptances)
-                                  OutlinedButton.icon(
-                                    icon: const Icon(Icons.map, size: 16),
-                                    label: const Text("Track", style: TextStyle(fontSize: 12)),
-                                    onPressed: () => _openTrackingPage(rideData, rideId, true),
-                                  ),
-
-                                // CHAT
-                                if (hasAnyAcceptances || ['accepted', 'tracking', 'in_progress'].contains(status))
-                                  OutlinedButton.icon(
-                                    icon: const Icon(Icons.chat, size: 16),
-                                    label: const Text("Chat", style: TextStyle(fontSize: 12)),
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => ChatPage(rideId: rideId),
-                                        ),
-                                      );
-                                    },
-                                  ),
-
-                                // CANCEL
-                                if (['pending', 'accepted', 'tracking'].contains(status))
-                                  OutlinedButton.icon(
-                                    icon: const Icon(Icons.cancel, size: 16),
-                                    label: const Text("Cancel", style: TextStyle(fontSize: 12)),
-                                    style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-                                    onPressed: () => _cancelRide(rideId, true),
-                                  ),
-
-                                // DONE
-                                if (['accepted', 'tracking'].contains(status))
-                                  OutlinedButton.icon(
-                                    icon: const Icon(Icons.check_circle, size: 16),
-                                    label: const Text("Done", style: TextStyle(fontSize: 12)),
-                                    style: OutlinedButton.styleFrom(foregroundColor: Colors.green),
-                                    onPressed: () => _markRideCompleted(rideId, true),
-                                  ),
-                              ],
-                            )
-
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
+            // Gradient Background
+            Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFF1E3C72),
+                    Color(0xFF2A5298),
+                    Color(0xFF7E22CE),
+                  ],
+                ),
+              ),
             ),
 
-            // ------------------ Accepted Rides ------------------
-            StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection("rides")
-                  .orderBy("timestamp", descending: true)
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+            // Animated Background Circles
+            Positioned(
+              top: -100,
+              right: -100,
+              child: Container(
+                width: 300,
+                height: 300,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      Colors.white.withOpacity(0.1),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: -150,
+              left: -100,
+              child: Container(
+                width: 400,
+                height: 400,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      Colors.white.withOpacity(0.08),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
 
-                if (snapshot.hasError) {
-                  return Center(child: Text("Error: ${snapshot.error}"));
-                }
+            // Main Content
+            SafeArea(
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: SlideTransition(
+                  position: _slideAnimation,
+                  child: Column(
+                    children: [
+                      // Custom App Bar
+                      _buildCustomAppBar(),
 
-                if (!snapshot.hasData) {
-                  return const Center(child: Text("No data available"));
-                }
+                      // Tab Bar
+                      _buildGlassmorphicTabBar(),
 
-                final rides = snapshot.data!.docs.where((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
-
-                  // ONLY accepted statuses allowed
-                  final status = (data['status'] ?? '').toString();
-                  if (![
-                    'pending',
-                    'accepted',
-                    'tracking',
-                    'in_progress',
-                    'completed',
-                    'cancelled'
-                  ].contains(status)) {
-                    return false;
-                  }
-
-                  final riderId = widget.userId;
-
-                  // CHECK ONLY FOR ACCEPTED USER
-                  final acceptedBy = data['acceptedBy'];
-                  final acceptedByList = List<String>.from(data['acceptedByList'] ?? []);
-
-                  final isRider =
-                      acceptedBy == riderId || acceptedByList.contains(riderId);
-
-                  return isRider; // 👈 FIX — Do NOT include posted rides
-                }).toList();
-
-                if (rides.isEmpty) {
-                  return const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.car_rental_outlined, size: 80, color: Colors.grey),
-                        SizedBox(height: 16),
-                        Text("No accepted rides yet."),
-                        Text("Browse available rides!", style: TextStyle(color: Colors.grey)),
-                      ],
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  padding: const EdgeInsets.all(8),
-                  itemCount: rides.length,
-                  itemBuilder: (context, index) {
-                    final rideData = rides[index].data() as Map<String, dynamic>? ?? {};
-                    final status = (rideData['status'] ?? 'pending').toString();
-                    final rideId = rides[index].id;
-                    final postedByName = rideData['postedByName'] ?? 'Unknown';
-
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      elevation: 2,
-                      color: status == "completed"
-                          ? Colors.green.shade50
-                          : status == "cancelled"
-                          ? Colors.red.shade50
-                          : Colors.white,
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      // Content
+                      Expanded(
+                        child: TabBarView(
                           children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.trip_origin, color: Colors.green, size: 20),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    rideData['from'] ?? 'Unknown',
-                                    style: const TextStyle(fontWeight: FontWeight.w500),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                const Icon(Icons.location_on, color: Colors.red, size: 20),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    rideData['to'] ?? 'Unknown',
-                                    style: const TextStyle(fontWeight: FontWeight.w500),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-
-                            Row(
-                              children: [
-                                _buildStatusChip(status, rideData),
-                                const SizedBox(width: 8),
-                                Text(
-                                  "Seats: ${rideData['seats'] ?? 0}",
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                              ],
-                            ),
-
-                            const SizedBox(height: 4),
-                            Text(
-                              "Driver: $postedByName",
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.blue,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            Text(
-                              "Departure: ${_formatDateTime(rideData['dateTime'])}",
-                              style: const TextStyle(fontSize: 12, color: Colors.grey),
-                            ),
-
-                            const SizedBox(height: 8),
-
-                            Wrap(
-                              spacing: 4,
-                              runSpacing: 4,
-                              children: [
-                                if (['accepted', 'tracking', 'in_progress']
-                                    .contains(status))
-                                  OutlinedButton.icon(
-                                    icon: const Icon(Icons.map, size: 16),
-                                    label: const Text("Track", style: TextStyle(fontSize: 12)),
-                                    onPressed: () =>
-                                        _openTrackingPage(rideData, rideId, false),
-                                  ),
-
-                                // FIXED: Chat button visible even in tracking/in_progress
-                                if (['accepted', 'pending', 'tracking', 'in_progress']
-                                    .contains(status))
-                                  OutlinedButton.icon(
-                                    icon: const Icon(Icons.chat, size: 16),
-                                    label: const Text("Chat", style: TextStyle(fontSize: 12)),
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => ChatPage(rideId: rideId),
-                                        ),
-                                      );
-                                    },
-                                  ),
-
-                                if (['accepted', 'pending'].contains(status))
-                                  OutlinedButton.icon(
-                                    icon: const Icon(Icons.cancel, size: 16),
-                                    label:
-                                    const Text("Cancel", style: TextStyle(fontSize: 12)),
-                                    style: OutlinedButton.styleFrom(
-                                      foregroundColor: Colors.red,
-                                    ),
-                                    onPressed: () => _cancelRide(rideId, false),
-                                  ),
-
-                                if (['accepted', 'tracking'].contains(status))
-                                  OutlinedButton.icon(
-                                    icon: const Icon(Icons.check_circle, size: 16),
-                                    label:
-                                    const Text("Done", style: TextStyle(fontSize: 12)),
-                                    style: OutlinedButton.styleFrom(
-                                      foregroundColor: Colors.green,
-                                    ),
-                                    onPressed: () => _markRideCompleted(rideId, false),
-                                  ),
-                              ],
-                            ),
+                            _buildPostedRides(),
+                            _buildAcceptedRides(),
                           ],
                         ),
                       ),
-                    );
-                  },
-                );
-              },
+                    ],
+                  ),
+                ),
+              ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCustomAppBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          // Back Button
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.2),
+                width: 1,
+              ),
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+          const SizedBox(width: 16),
+
+          // Car Icon
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.2),
+                width: 1,
+              ),
+            ),
+            child: const Icon(
+              Icons.directions_car,
+              color: Colors.white,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          const Text(
+            "Your Rides",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGlassmorphicTabBar() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.2),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 20,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: TabBar(
+        indicator: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        indicatorSize: TabBarIndicatorSize.tab,
+        dividerColor: Colors.transparent,
+        labelColor: const Color(0xFF1E3C72),
+        unselectedLabelColor: Colors.white,
+        labelStyle: const TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.5,
+        ),
+        tabs: const [
+          Tab(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.post_add, size: 18),
+                SizedBox(width: 6),
+                Text("Posted"),
+              ],
+            ),
+          ),
+          Tab(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.check_circle, size: 18),
+                SizedBox(width: 6),
+                Text("Accepted"),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPostedRides() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection("rides")
+          .where('riderId', isEqualTo: widget.userId)
+          .orderBy("timestamp", descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(
+            child: CircularProgressIndicator(
+              color: Colors.white.withOpacity(0.8),
+            ),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Text(
+              "Error: ${snapshot.error}",
+              style: const TextStyle(color: Colors.white),
+            ),
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.2),
+                      width: 2,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.directions_car_outlined,
+                    size: 64,
+                    color: Colors.white.withOpacity(0.7),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  "No posted rides yet",
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "Tap + to post a ride!",
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.7),
+                    fontSize: 15,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final rides = snapshot.data!.docs;
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: rides.length,
+          itemBuilder: (context, index) {
+            final rideData = rides[index].data() as Map<String, dynamic>? ?? {};
+            final status = (rideData['status'] ?? 'pending').toString();
+            final rideId = rides[index].id;
+
+            final acceptedBy = rideData['acceptedBy'];
+            final acceptedByList =
+            List<String>.from(rideData['acceptedByList'] ?? []);
+            final hasAnyAcceptances =
+                acceptedBy != null || acceptedByList.isNotEmpty;
+
+            final totalSeats = rideData['seats'] ?? 0;
+            final remainingSeats = rideData['remainingSeats'] ?? totalSeats;
+
+            return _buildRideCard(
+              rideData: rideData,
+              status: status,
+              rideId: rideId,
+              isPoster: true,
+              hasAnyAcceptances: hasAnyAcceptances,
+              totalSeats: totalSeats,
+              remainingSeats: remainingSeats,
+              acceptedByList: acceptedByList,
+              acceptedBy: acceptedBy,
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildAcceptedRides() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection("rides")
+          .orderBy("timestamp", descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(
+            child: CircularProgressIndicator(
+              color: Colors.white.withOpacity(0.8),
+            ),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Text(
+              "Error: ${snapshot.error}",
+              style: const TextStyle(color: Colors.white),
+            ),
+          );
+        }
+
+        if (!snapshot.hasData) {
+          return const Center(
+            child: Text(
+              "No data available",
+              style: TextStyle(color: Colors.white),
+            ),
+          );
+        }
+
+        final rides = snapshot.data!.docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          final status = (data['status'] ?? '').toString();
+
+          if (![
+            'pending',
+            'accepted',
+            'tracking',
+            'in_progress',
+            'completed',
+            'cancelled'
+          ].contains(status)) {
+            return false;
+          }
+
+          final riderId = widget.userId;
+          final acceptedBy = data['acceptedBy'];
+          final acceptedByList =
+          List<String>.from(data['acceptedByList'] ?? []);
+
+          return acceptedBy == riderId || acceptedByList.contains(riderId);
+        }).toList();
+
+        if (rides.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.2),
+                      width: 2,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.car_rental_outlined,
+                    size: 64,
+                    color: Colors.white.withOpacity(0.7),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  "No accepted rides yet",
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "Browse available rides!",
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.7),
+                    fontSize: 15,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: rides.length,
+          itemBuilder: (context, index) {
+            final rideData = rides[index].data() as Map<String, dynamic>? ?? {};
+            final status = (rideData['status'] ?? 'pending').toString();
+            final rideId = rides[index].id;
+            final postedByName = rideData['postedByName'] ?? 'Unknown';
+
+            return _buildRideCard(
+              rideData: rideData,
+              status: status,
+              rideId: rideId,
+              isPoster: false,
+              postedByName: postedByName,
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildRideCard({
+    required Map<String, dynamic> rideData,
+    required String status,
+    required String rideId,
+    required bool isPoster,
+    bool hasAnyAcceptances = false,
+    int totalSeats = 0,
+    int remainingSeats = 0,
+    List<String>? acceptedByList,
+    dynamic acceptedBy,
+    String? postedByName,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: status == "completed"
+            ? Colors.green.withOpacity(0.15)
+            : status == "cancelled"
+            ? Colors.red.withOpacity(0.15)
+            : Colors.white.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.3),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // From Location
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.trip_origin,
+                    color: Colors.greenAccent,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    rideData['from'] ?? 'Unknown',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            // To Location
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.location_on,
+                    color: Colors.redAccent,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    rideData['to'] ?? 'Unknown',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Status and Seats
+            Row(
+              children: [
+                _buildStatusChip(status, rideData),
+                const SizedBox(width: 10),
+                if (isPoster)
+                  Container(
+                    padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(
+                      "$remainingSeats/$totalSeats seats",
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withOpacity(0.9),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  )
+                else
+                  Container(
+                    padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(
+                      "${rideData['seats'] ?? 0} seats",
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withOpacity(0.9),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            // Driver Name (for accepted rides)
+            if (!isPoster && postedByName != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.person,
+                      size: 14,
+                      color: Colors.white.withOpacity(0.7),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      "Driver: $postedByName",
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.white.withOpacity(0.9),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            // Departure Time
+            Row(
+              children: [
+                Icon(
+                  Icons.access_time,
+                  size: 14,
+                  color: Colors.white.withOpacity(0.7),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  _formatDateTime(rideData['dateTime']),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.white.withOpacity(0.7),
+                  ),
+                ),
+              ],
+            ),
+
+            // Acceptance Info
+            if (isPoster && hasAnyAcceptances) ...[
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Icon(
+                    Icons.check_circle,
+                    size: 14,
+                    color: Colors.greenAccent.withOpacity(0.8),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    "${(acceptedByList?.length ?? 0) + (acceptedBy != null ? 1 : 0)} accepted",
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.greenAccent.withOpacity(0.9),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+
+            const SizedBox(height: 12),
+
+            // Action Buttons
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _buildActionButtons(
+                status: status,
+                rideId: rideId,
+                rideData: rideData,
+                isPoster: isPoster,
+                hasAnyAcceptances: hasAnyAcceptances,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildActionButtons({
+    required String status,
+    required String rideId,
+    required Map<String, dynamic> rideData,
+    required bool isPoster,
+    bool hasAnyAcceptances = false,
+  }) {
+    List<Widget> buttons = [];
+
+    // Track Button
+    if ((isPoster && (['accepted', 'tracking', 'in_progress'].contains(status) || hasAnyAcceptances)) ||
+        (!isPoster && ['accepted', 'tracking', 'in_progress'].contains(status))) {
+      buttons.add(
+        _buildActionButton(
+          icon: Icons.map,
+          label: "Track",
+          color: Colors.purple,
+          onPressed: () => _openTrackingPage(rideData, rideId, isPoster),
+        ),
+      );
+    }
+
+    // Chat Button
+    if ((isPoster && (hasAnyAcceptances || ['accepted', 'tracking', 'in_progress'].contains(status))) ||
+        (!isPoster && ['accepted', 'pending', 'tracking', 'in_progress'].contains(status))) {
+      buttons.add(
+        _buildActionButton(
+          icon: Icons.chat,
+          label: "Chat",
+          color: Colors.blue,
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => ChatPage(rideId: rideId)),
+            );
+          },
+        ),
+      );
+    }
+
+    // Cancel Button
+    if ((isPoster && ['pending', 'accepted', 'tracking'].contains(status)) ||
+        (!isPoster && ['accepted', 'pending'].contains(status))) {
+      buttons.add(
+        _buildActionButton(
+          icon: Icons.cancel,
+          label: "Cancel",
+          color: Colors.red,
+          onPressed: () => _cancelRide(rideId, isPoster),
+        ),
+      );
+    }
+
+    // Done Button
+    if (['accepted', 'tracking'].contains(status)) {
+      buttons.add(
+        _buildActionButton(
+          icon: Icons.check_circle,
+          label: "Done",
+          color: Colors.green,
+          onPressed: () => _markRideCompleted(rideId, isPoster),
+        ),
+      );
+    }
+
+    return buttons;
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onPressed,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [color, color.withOpacity(0.7)],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 16, color: Colors.white),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
