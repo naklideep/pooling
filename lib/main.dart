@@ -3,8 +3,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'pages/login_page.dart';
-import 'pages/admin_dashboard_page.dart'; // ✅ Import admin page here
+import 'pages/admin_dashboard_page.dart';
+import 'splash_page.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 FlutterLocalNotificationsPlugin();
@@ -73,7 +73,7 @@ class GharTakApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         useMaterial3: true,
       ),
-      home:  LoginPage(),
+      home:  const SplashPage(),
       routes: {
         '/admin': (_) => const AdminDashboardPage(), // ✅ Ensure this route exists
       },

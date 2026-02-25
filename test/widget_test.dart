@@ -5,7 +5,8 @@ import 'package:riyal1/main.dart';
 import 'package:riyal1/pages/login_page.dart';
 
 void main() {
-  testWidgets('App loads and shows LoginPage', (WidgetTester tester) async {
+  testWidgets('App loads and shows LoginPage', (WidgetTester tester) async
+  {
     // Build our app and trigger a frame.
     await tester.pumpWidget(GharTakApp());
 

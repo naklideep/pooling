@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'profile_page.dart';
 import 'login_page.dart';
@@ -20,6 +21,7 @@ class _DashboardPageState extends State<DashboardPage>
   final FirebaseAuth _auth = FirebaseAuth.instance;
   String userName = "User";
   int selectedIndex = 0;
+  DateTime? _lastBackPressed;
 
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -62,7 +64,6 @@ class _DashboardPageState extends State<DashboardPage>
   }
 
   void _logout() async {
-    // Show confirmation dialog with same style
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -150,93 +151,111 @@ class _DashboardPageState extends State<DashboardPage>
     final user = _auth.currentUser;
     if (user == null) return LoginPage();
 
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        body: Stack(
-          children: [
-            // Gradient Background (same as login page)
-            Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFF1E3C72),
-                    Color(0xFF2A5298),
-                    Color(0xFF7E22CE),
-                  ],
-                ),
-              ),
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) async {
+        if (didPop) return;
+        final now = DateTime.now();
+        if (_lastBackPressed == null ||
+            now.difference(_lastBackPressed!) > const Duration(seconds: 2)) {
+          _lastBackPressed = now;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text("Press back again to exit"),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              margin: const EdgeInsets.all(16),
             ),
-
-            // Animated Background Circles
-            Positioned(
-              top: -100,
-              right: -100,
-              child: Container(
-                width: 300,
-                height: 300,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
+          );
+        } else {
+          SystemNavigator.pop();
+        }
+      },
+      child: DefaultTabController(
+        length: 2,
+        child: Scaffold(
+          body: Stack(
+            children: [
+              // Gradient Background
+              Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                     colors: [
-                      Colors.white.withOpacity(0.1),
-                      Colors.transparent,
+                      Color(0xFF1E3C72),
+                      Color(0xFF2A5298),
+                      Color(0xFF7E22CE),
                     ],
                   ),
                 ),
               ),
-            ),
-            Positioned(
-              bottom: -150,
-              left: -100,
-              child: Container(
-                width: 400,
-                height: 400,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      Colors.white.withOpacity(0.08),
-                      Colors.transparent,
-                    ],
+
+              // Animated Background Circles
+              Positioned(
+                top: -100,
+                right: -100,
+                child: Container(
+                  width: 300,
+                  height: 300,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        Colors.white.withOpacity(0.1),
+                        Colors.transparent,
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
+              Positioned(
+                bottom: -150,
+                left: -100,
+                child: Container(
+                  width: 400,
+                  height: 400,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        Colors.white.withOpacity(0.08),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
 
-            // Main Content
-            SafeArea(
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: SlideTransition(
-                  position: _slideAnimation,
-                  child: Column(
-                    children: [
-                      // Custom App Bar
-                      _buildCustomAppBar(),
-
-                      // Tab Bar with Glassmorphism
-                      _buildGlassmorphicTabBar(),
-
-                      // Content
-                      Expanded(
-                        child: TabBarView(
-                          children: [
-                            PostRidePage(),
-                            FindRideWidget(userId: user.uid),
-                          ],
+              // Main Content
+              SafeArea(
+                child: FadeTransition(
+                  opacity: _fadeAnimation,
+                  child: SlideTransition(
+                    position: _slideAnimation,
+                    child: Column(
+                      children: [
+                        _buildCustomAppBar(),
+                        _buildGlassmorphicTabBar(),
+                        Expanded(
+                          child: TabBarView(
+                            children: [
+                              PostRidePage(),
+                              FindRideWidget(userId: user.uid),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
+          drawer: _buildModernDrawer(),
         ),
-        drawer: _buildModernDrawer(),
       ),
     );
   }
@@ -246,7 +265,6 @@ class _DashboardPageState extends State<DashboardPage>
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          // Menu Button with Glassmorphism
           Builder(
             builder: (context) => Container(
               decoration: BoxDecoration(
@@ -264,8 +282,6 @@ class _DashboardPageState extends State<DashboardPage>
             ),
           ),
           const SizedBox(width: 16),
-
-          // App Icon and Title
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
@@ -289,8 +305,6 @@ class _DashboardPageState extends State<DashboardPage>
             ),
           ),
           const Spacer(),
-
-          // Profile Button
           Container(
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.15),
@@ -404,13 +418,11 @@ class _DashboardPageState extends State<DashboardPage>
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
-            // Modern Drawer Header
             Container(
               padding: const EdgeInsets.fromLTRB(24, 60, 24, 32),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Profile Avatar with Glassmorphism
                   Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
@@ -486,7 +498,6 @@ class _DashboardPageState extends State<DashboardPage>
               ),
             ),
 
-            // Menu Items with Modern Design
             _buildDrawerItem(
               icon: Icons.person_outline,
               title: "Profile",
@@ -506,7 +517,8 @@ class _DashboardPageState extends State<DashboardPage>
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => YourRidesPage(userId: _auth.currentUser!.uid),
+                    builder: (_) =>
+                        YourRidesPage(userId: _auth.currentUser!.uid),
                   ),
                 );
               },
@@ -519,7 +531,8 @@ class _DashboardPageState extends State<DashboardPage>
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => SavedRoutesPage(userId: _auth.currentUser!.uid),
+                    builder: (_) =>
+                        SavedRoutesPage(userId: _auth.currentUser!.uid),
                   ),
                 );
               },
@@ -533,7 +546,6 @@ class _DashboardPageState extends State<DashboardPage>
               },
             ),
 
-            // Divider
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               child: Divider(
@@ -542,7 +554,6 @@ class _DashboardPageState extends State<DashboardPage>
               ),
             ),
 
-            // Logout Button
             _buildDrawerItem(
               icon: Icons.logout,
               title: "Logout",
@@ -552,7 +563,6 @@ class _DashboardPageState extends State<DashboardPage>
 
             const SizedBox(height: 32),
 
-            // App Version Footer
             Padding(
               padding: const EdgeInsets.all(24),
               child: Column(

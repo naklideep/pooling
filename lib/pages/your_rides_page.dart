@@ -5,6 +5,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:geolocator/geolocator.dart';
 import 'chat_page.dart';
 import 'live_ride_tracking_page.dart';
+import 'live_ride_tracking_page.dart';
+import 'ride_active_page.dart';
 
 class YourRidesPage extends StatefulWidget {
   final String userId;
@@ -1215,37 +1217,27 @@ class _YourRidesPageState extends State<YourRidesPage>
   }) {
     List<Widget> buttons = [];
 
-    // Track Button
-    if ((isPoster && (['accepted', 'tracking', 'in_progress'].contains(status) || hasAnyAcceptances)) ||
-        (!isPoster && ['accepted', 'tracking', 'in_progress'].contains(status))) {
+// Start Ride Button (opens RideActivePage which gates Chat + Track)
+    if ((isPoster && (['accepted', 'in_progress', 'tracking'].contains(status) || hasAnyAcceptances)) ||
+        (!isPoster && ['accepted', 'in_progress', 'tracking'].contains(status))) {
       buttons.add(
         _buildActionButton(
-          icon: Icons.map,
-          label: "Track",
-          color: Colors.purple,
-          onPressed: () => _openTrackingPage(rideData, rideId, isPoster),
+          icon: Icons.rocket_launch_rounded,
+          label: status == 'accepted' ? "Start Ride" : "Active Ride",
+          color: const Color(0xFF7C3AED),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => RideActivePage(
+                rideId: rideId,
+                userId: widget.userId,
+                isDriver: isPoster,
+              ),
+            ),
+          ),
         ),
       );
     }
-
-    // Chat Button
-    if ((isPoster && (hasAnyAcceptances || ['accepted', 'tracking', 'in_progress'].contains(status))) ||
-        (!isPoster && ['accepted', 'pending', 'tracking', 'in_progress'].contains(status))) {
-      buttons.add(
-        _buildActionButton(
-          icon: Icons.chat,
-          label: "Chat",
-          color: Colors.blue,
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => ChatPage(rideId: rideId)),
-            );
-          },
-        ),
-      );
-    }
-
     // Cancel Button
     if ((isPoster && ['pending', 'accepted', 'tracking'].contains(status)) ||
         (!isPoster && ['accepted', 'pending'].contains(status))) {

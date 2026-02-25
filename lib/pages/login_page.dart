@@ -36,7 +36,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     _animationController.forward();
   }
 
-  // Login function
   void _login() async {
     String email = _emailController.text.trim();
     String password = _passwordController.text.trim();
@@ -68,13 +67,11 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         return;
       }
 
-      // 🔥 ENHANCED ADMIN CHECK - Check both email AND Firestore role
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.user!.uid)
           .get();
 
-      // Check if user is banned first
       if (userDoc.exists && (userDoc.data()?['isBanned'] == true)) {
         await _auth.signOut();
         _showSnack("❌ You are banned from the app", isError: true);
@@ -82,16 +79,12 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         return;
       }
 
-      // Check admin by email OR role field
       bool isAdmin = user.user!.email == adminEmail;
-
-      // Also check if user has 'admin' role in Firestore (more secure)
       if (userDoc.exists && userDoc.data()?['role'] == 'admin') {
         isAdmin = true;
       }
 
       if (isAdmin) {
-        // Ensure admin role is set in Firestore (for first-time admin)
         if (!userDoc.exists || userDoc.data()?['role'] != 'admin') {
           await FirebaseFirestore.instance
               .collection('users')
@@ -100,13 +93,11 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
             'role': 'admin',
             'email': user.user!.email,
             'name': user.user!.displayName ?? 'Admin',
-            'isAdmin': true, // Extra flag for queries
+            'isAdmin': true,
           }, SetOptions(merge: true));
         }
 
         _showSnack("✅ Welcome Admin!", isError: false);
-
-        // Navigate to Admin Dashboard
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const AdminDashboardPage()),
@@ -115,7 +106,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         return;
       }
 
-      // Regular user - Navigate to normal dashboard
       _showSnack("✅ Login successful!");
       Navigator.pushReplacement(
         context,
@@ -155,7 +145,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       _showSnack("⚠️ Enter your email first");
       return;
     }
-
     try {
       await _auth.sendPasswordResetEmail(email: _emailController.text.trim());
       _showSnack("📧 Password reset email sent! Check your inbox");
@@ -218,7 +207,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
             ),
           ),
 
-          // Animated Background Circles
           Positioned(
             top: -100,
             right: -100,
@@ -228,10 +216,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
-                  colors: [
-                    Colors.white.withOpacity(0.1),
-                    Colors.transparent,
-                  ],
+                  colors: [Colors.white.withOpacity(0.1), Colors.transparent],
                 ),
               ),
             ),
@@ -245,16 +230,12 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
-                  colors: [
-                    Colors.white.withOpacity(0.08),
-                    Colors.transparent,
-                  ],
+                  colors: [Colors.white.withOpacity(0.08), Colors.transparent],
                 ),
               ),
             ),
           ),
 
-          // Main Content
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
@@ -264,7 +245,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Logo and App Name
+                      // Logo
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
@@ -305,7 +286,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                       ),
                       const SizedBox(height: 48),
 
-                      // Login Card with Glassmorphism
+                      // Login Card
                       Container(
                         padding: const EdgeInsets.all(28),
                         decoration: BoxDecoration(
@@ -344,7 +325,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                             ),
                             const SizedBox(height: 32),
 
-                            // Email Field
                             _buildTextField(
                               controller: _emailController,
                               label: "Email Address",
@@ -353,7 +333,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                             ),
                             const SizedBox(height: 20),
 
-                            // Password Field
                             _buildTextField(
                               controller: _passwordController,
                               label: "Password",
@@ -363,41 +342,57 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                             ),
                             const SizedBox(height: 16),
 
-                            // Remember Me & Forgot Password
-                            Row(
-                              children: [
-                                SizedBox(
-                                  height: 24,
-                                  width: 24,
-                                  child: Checkbox(
-                                    value: _rememberMe,
-                                    onChanged: (val) => setState(() => _rememberMe = val!),
-                                    fillColor: MaterialStateProperty.all(Colors.white.withOpacity(0.3)),
-                                    checkColor: Colors.white,
-                                    side: BorderSide(color: Colors.white.withOpacity(0.5)),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                const Text(
-                                  "Remember Me",
-                                  style: TextStyle(color: Colors.white, fontSize: 14),
-                                ),
-                                const Spacer(),
-                                TextButton(
-                                  onPressed: _forgotPassword,
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: Colors.white,
-                                  ),
-                                  child: const Text(
-                                    "Forgot Password?",
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
+                            // ── Remember Me & Forgot Password ─────────
+                            // Use LayoutBuilder to avoid overflow on small screens
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                return Row(
+                                  children: [
+                                    SizedBox(
+                                      height: 24,
+                                      width: 24,
+                                      child: Checkbox(
+                                        value: _rememberMe,
+                                        onChanged: (val) =>
+                                            setState(() => _rememberMe = val!),
+                                        fillColor: MaterialStateProperty.all(
+                                            Colors.white.withOpacity(0.3)),
+                                        checkColor: Colors.white,
+                                        side: BorderSide(
+                                            color: Colors.white.withOpacity(0.5)),
+                                      ),
                                     ),
-                                  ),
-                                ),
-                              ],
+                                    const SizedBox(width: 8),
+                                    const Text(
+                                      "Remember Me",
+                                      style: TextStyle(
+                                          color: Colors.white, fontSize: 14),
+                                    ),
+                                    const Spacer(),
+                                    TextButton(
+                                      onPressed: _forgotPassword,
+                                      style: TextButton.styleFrom(
+                                        foregroundColor: Colors.white,
+                                        // Shrink padding so it never overflows
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 6, vertical: 4),
+                                        minimumSize: Size.zero,
+                                        tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                      ),
+                                      child: const Text(
+                                        "Forgot Password?",
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
                             ),
+
                             const SizedBox(height: 28),
 
                             // Login Button
@@ -413,7 +408,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(16),
                                   ),
-                                  disabledBackgroundColor: Colors.white.withOpacity(0.5),
+                                  disabledBackgroundColor:
+                                  Colors.white.withOpacity(0.5),
                                 ),
                                 child: const Text(
                                   "Login",
@@ -427,7 +423,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                             ),
                             const SizedBox(height: 20),
 
-                            // Divider
                             Row(
                               children: [
                                 Expanded(
@@ -437,7 +432,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                   ),
                                 ),
                                 Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16),
                                   child: Text(
                                     "OR",
                                     style: TextStyle(
@@ -465,7 +461,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                 onPressed: _createAccount,
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: Colors.white,
-                                  side: const BorderSide(color: Colors.white, width: 2),
+                                  side: const BorderSide(
+                                      color: Colors.white, width: 2),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(16),
                                   ),
@@ -507,9 +504,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 3,
-                      ),
+                          color: Colors.white, strokeWidth: 3),
                       SizedBox(height: 20),
                       Text(
                         "Logging in...",
@@ -542,10 +537,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.15),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.3),
-          width: 1,
-        ),
+        border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
       ),
       child: TextField(
         controller: controller,
@@ -556,22 +548,25 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         decoration: InputDecoration(
           labelText: label,
           labelStyle: TextStyle(
-            color: Colors.white.withOpacity(0.8),
-            fontSize: 15,
-          ),
-          prefixIcon: Icon(icon, color: Colors.white.withOpacity(0.8), size: 22),
+              color: Colors.white.withOpacity(0.8), fontSize: 15),
+          prefixIcon:
+          Icon(icon, color: Colors.white.withOpacity(0.8), size: 22),
           suffixIcon: isPassword
               ? IconButton(
             icon: Icon(
-              _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+              _obscurePassword
+                  ? Icons.visibility_outlined
+                  : Icons.visibility_off_outlined,
               color: Colors.white.withOpacity(0.8),
               size: 22,
             ),
-            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+            onPressed: () =>
+                setState(() => _obscurePassword = !_obscurePassword),
           )
               : null,
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          contentPadding:
+          const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
           floatingLabelBehavior: FloatingLabelBehavior.never,
         ),
       ),
