@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
 import 'pages/admin_dashboard_page.dart';
 import 'splash_page.dart';
 
@@ -36,7 +38,16 @@ void _showLocalNotification(RemoteMessage message) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // ✅ Firestore performance setting
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: true,
+  );
+
   await _initializeNotifications();
 
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
@@ -73,9 +84,9 @@ class GharTakApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         useMaterial3: true,
       ),
-      home:  const SplashPage(),
+      home: const SplashPage(),
       routes: {
-        '/admin': (_) => const AdminDashboardPage(), // ✅ Ensure this route exists
+        '/admin': (_) => const AdminDashboardPage(),
       },
     );
   }

@@ -5,7 +5,6 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:geolocator/geolocator.dart';
 import 'chat_page.dart';
 import 'live_ride_tracking_page.dart';
-import 'live_ride_tracking_page.dart';
 import 'ride_active_page.dart';
 
 class YourRidesPage extends StatefulWidget {
@@ -18,51 +17,34 @@ class YourRidesPage extends StatefulWidget {
 
 class _YourRidesPageState extends State<YourRidesPage>
     with SingleTickerProviderStateMixin {
+  static const Color kNavy = Color(0xFF1A2340);
+  static const Color kYellow = Color(0xFFFFCC00);
+  static const Color kBackground = Color(0xFFEEF0F5);
+
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
   FlutterLocalNotificationsPlugin();
-
   final Set<String> _notifiedRides = {};
-
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _initializeNotifications();
     _listenForAcceptedRides();
-
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
-    );
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.1),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOutCubic,
-    ));
-    _animationController.forward();
   }
 
   @override
   void dispose() {
-    _animationController.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
   Future<void> _initializeNotifications() async {
     const AndroidInitializationSettings initSettingsAndroid =
     AndroidInitializationSettings('@mipmap/ic_launcher');
-
     const InitializationSettings initSettings =
     InitializationSettings(android: initSettingsAndroid);
-
     await _flutterLocalNotificationsPlugin.initialize(initSettings);
   }
 
@@ -76,7 +58,6 @@ class _YourRidesPageState extends State<YourRidesPage>
         if (change.type == DocumentChangeType.modified) {
           final data = change.doc.data();
           final rideId = change.doc.id;
-
           if (data != null && !_notifiedRides.contains(rideId)) {
             if (data['status'] == 'accepted') {
               _showNotification(
@@ -91,7 +72,7 @@ class _YourRidesPageState extends State<YourRidesPage>
   }
 
   Future<void> _showNotification(String message) async {
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
+    const AndroidNotificationDetails androidDetails =
     AndroidNotificationDetails(
       'ride_updates',
       'Ride Updates',
@@ -99,15 +80,13 @@ class _YourRidesPageState extends State<YourRidesPage>
       priority: Priority.high,
       showWhen: true,
     );
-
-    const NotificationDetails platformChannelSpecifics =
-    NotificationDetails(android: androidPlatformChannelSpecifics);
-
+    const NotificationDetails details =
+    NotificationDetails(android: androidDetails);
     await _flutterLocalNotificationsPlugin.show(
       DateTime.now().millisecondsSinceEpoch ~/ 1000,
       'Ride Update 🚗',
       message,
-      platformChannelSpecifics,
+      details,
     );
   }
 
@@ -134,64 +113,41 @@ class _YourRidesPageState extends State<YourRidesPage>
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E3C72).withOpacity(0.95),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide(
-            color: Colors.white.withOpacity(0.2),
-            width: 1,
-          ),
-        ),
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.2),
+                color: const Color(0xFFE8F5E9),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(
-                Icons.check_circle_outline,
-                color: Colors.greenAccent,
-                size: 24,
-              ),
+              child: const Icon(Icons.check_circle_outline,
+                  color: Colors.green, size: 22),
             ),
             const SizedBox(width: 12),
-            const Text(
-              "Complete Ride?",
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-              ),
-            ),
+            const Text("Complete Ride?",
+                style: TextStyle(
+                    color: kNavy, fontWeight: FontWeight.bold, fontSize: 18)),
           ],
         ),
         content: Text(
-          "Are you sure you want to mark this ride as completed? "
-              "Both parties must confirm for the ride to be fully completed.",
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.8),
-            fontSize: 15,
-            height: 1.5,
-          ),
+          "Both parties must confirm for the ride to be fully completed.",
+          style: TextStyle(color: Colors.grey.shade600, fontSize: 14, height: 1.5),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text(
-              "Cancel",
-              style: TextStyle(color: Colors.white70),
-            ),
+            child: Text("Cancel", style: TextStyle(color: Colors.grey.shade500)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.greenAccent,
-              foregroundColor: const Color(0xFF1E3C72),
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+                  borderRadius: BorderRadius.circular(10)),
             ),
             child: const Text("Yes, Complete"),
           ),
@@ -226,7 +182,6 @@ class _YourRidesPageState extends State<YourRidesPage>
 
       final updatedDoc = await rideRef.get();
       final updated = updatedDoc.data()!;
-
       final bothCompleted = (updated['posterCompleted'] ?? false) &&
           (updated['accepterCompleted'] ?? false);
 
@@ -264,8 +219,7 @@ class _YourRidesPageState extends State<YourRidesPage>
       final posterCancelled = data['posterCancelled'] ?? false;
       final accepterCancelled = data['accepterCancelled'] ?? false;
 
-      if ((isPoster && posterCancelled) ||
-          (!isPoster && accepterCancelled)) {
+      if ((isPoster && posterCancelled) || (!isPoster && accepterCancelled)) {
         _showInfo("You've already marked this ride as cancelled.");
         return;
       }
@@ -273,56 +227,39 @@ class _YourRidesPageState extends State<YourRidesPage>
       final confirm = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          backgroundColor: const Color(0xFF1E3C72).withOpacity(0.95),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-            side: BorderSide(
-              color: Colors.white.withOpacity(0.2),
-              width: 1,
-            ),
-          ),
+          backgroundColor: Colors.white,
+          shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.2),
+                  color: const Color(0xFFFFEBEE),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(
-                  Icons.warning_amber_rounded,
-                  color: Colors.redAccent,
-                  size: 24,
-                ),
+                child: const Icon(Icons.warning_amber_rounded,
+                    color: Colors.redAccent, size: 22),
               ),
               const SizedBox(width: 12),
-              const Text(
-                "Cancel Ride?",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
-              ),
+              const Text("Cancel Ride?",
+                  style: TextStyle(
+                      color: kNavy,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18)),
             ],
           ),
           content: Text(
             isPoster
                 ? "You're about to cancel this ride. The accepter must also confirm to fully cancel it."
                 : "You're about to cancel your participation. The poster must also confirm to fully cancel it.",
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.8),
-              fontSize: 15,
-              height: 1.5,
-            ),
+            style:
+            TextStyle(color: Colors.grey.shade600, fontSize: 14, height: 1.5),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text(
-                "No",
-                style: TextStyle(color: Colors.white70),
-              ),
+              child: Text("No", style: TextStyle(color: Colors.grey.shade500)),
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
@@ -330,8 +267,7 @@ class _YourRidesPageState extends State<YourRidesPage>
                 backgroundColor: Colors.redAccent,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                    borderRadius: BorderRadius.circular(10)),
               ),
               child: const Text("Yes, Cancel"),
             ),
@@ -347,7 +283,6 @@ class _YourRidesPageState extends State<YourRidesPage>
 
       final updatedDoc = await rideRef.get();
       final updated = updatedDoc.data()!;
-
       final posterNow = updated['posterCancelled'] ?? false;
       final accepterNow = updated['accepterCancelled'] ?? false;
 
@@ -382,11 +317,11 @@ class _YourRidesPageState extends State<YourRidesPage>
       return;
     }
 
-    // When driver starts tracking, update Firestore
     if (isDriver) {
-      FirebaseFirestore.instance.collection('rides').doc(rideId).update({
-        'status': 'tracking',
-      });
+      FirebaseFirestore.instance
+          .collection('rides')
+          .doc(rideId)
+          .update({'status': 'tracking'});
     }
 
     Navigator.push(
@@ -406,68 +341,47 @@ class _YourRidesPageState extends State<YourRidesPage>
 
   void _showSuccess(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle_outline, color: Colors.white),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(message, style: const TextStyle(fontSize: 15)),
-            ),
-          ],
-        ),
-        backgroundColor: const Color(0xFF43A047),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.all(16),
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Row(children: [
+        const Icon(Icons.check_circle_outline, color: Colors.white),
+        const SizedBox(width: 12),
+        Expanded(child: Text(message, style: const TextStyle(fontSize: 15))),
+      ]),
+      backgroundColor: const Color(0xFF43A047),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.all(16),
+    ));
   }
 
   void _showError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.error_outline, color: Colors.white),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(message, style: const TextStyle(fontSize: 15)),
-            ),
-          ],
-        ),
-        backgroundColor: const Color(0xFFE53935),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.all(16),
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Row(children: [
+        const Icon(Icons.error_outline, color: Colors.white),
+        const SizedBox(width: 12),
+        Expanded(child: Text(message, style: const TextStyle(fontSize: 15))),
+      ]),
+      backgroundColor: const Color(0xFFE53935),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.all(16),
+    ));
   }
 
   void _showInfo(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.info_outline, color: Colors.white),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(message, style: const TextStyle(fontSize: 15)),
-            ),
-          ],
-        ),
-        backgroundColor: Colors.orange,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.all(16),
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Row(children: [
+        const Icon(Icons.info_outline, color: Colors.white),
+        const SizedBox(width: 12),
+        Expanded(child: Text(message, style: const TextStyle(fontSize: 15))),
+      ]),
+      backgroundColor: Colors.orange,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.all(16),
+    ));
   }
 
   Widget _buildStatusChip(String status, Map<String, dynamic> rideData) {
@@ -477,204 +391,128 @@ class _YourRidesPageState extends State<YourRidesPage>
     final accepterCancelled = rideData['accepterCancelled'] ?? false;
 
     Color color;
+    Color bgColor;
     String text = status.toUpperCase();
 
     switch (status) {
       case 'pending':
-        color = Colors.orange;
+        color = const Color(0xFFE65100);
+        bgColor = const Color(0xFFFFF3E0);
         break;
       case 'accepted':
-        color = Colors.blue;
+        color = const Color(0xFF1565C0);
+        bgColor = const Color(0xFFE3F2FD);
         if (posterCompleted && !accepterCompleted) {
-          text = 'ACCEPTED (Driver ✓)';
+          text = 'DRIVER ✓';
         } else if (!posterCompleted && accepterCompleted) {
-          text = 'ACCEPTED (Rider ✓)';
+          text = 'RIDER ✓';
         }
-        if (posterCancelled && !accepterCancelled) {
-          text = 'CANCEL PENDING (Driver)';
-          color = Colors.red.shade300;
-        } else if (!posterCancelled && accepterCancelled) {
-          text = 'CANCEL PENDING (Rider)';
-          color = Colors.red.shade300;
+        if (posterCancelled || accepterCancelled) {
+          color = Colors.redAccent;
+          bgColor = const Color(0xFFFFEBEE);
+          text = 'CANCEL PENDING';
         }
         break;
       case 'tracking':
-        color = Colors.purple;
+        color = const Color(0xFF6A1B9A);
+        bgColor = const Color(0xFFF3E5F5);
         text = 'TRACKING';
         break;
       case 'in_progress':
-        color = Colors.teal;
+        color = const Color(0xFF00695C);
+        bgColor = const Color(0xFFE0F2F1);
         text = 'IN PROGRESS';
         break;
       case 'completed':
-        color = Colors.green;
+        color = const Color(0xFF2E7D32);
+        bgColor = const Color(0xFFE8F5E9);
         break;
       case 'cancelled':
-        color = Colors.red;
+        color = Colors.redAccent;
+        bgColor = const Color(0xFFFFEBEE);
         break;
       default:
-        color = Colors.grey;
+        color = Colors.grey.shade600;
+        bgColor = Colors.grey.shade100;
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.5), width: 1.5),
+        color: bgColor,
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
         text,
         style: TextStyle(
-          color: color,
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 0.5,
-        ),
+            color: color,
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.4),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        body: Stack(
-          children: [
-            // Gradient Background
-            Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFF1E3C72),
-                    Color(0xFF2A5298),
-                    Color(0xFF7E22CE),
-                  ],
-                ),
-              ),
+    return Scaffold(
+      backgroundColor: kBackground,
+      body: Column(
+        children: [
+          _buildAppBar(),
+          _buildTabBar(),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildPostedRides(),
+                _buildAcceptedRides(),
+              ],
             ),
-
-            // Animated Background Circles
-            Positioned(
-              top: -100,
-              right: -100,
-              child: Container(
-                width: 300,
-                height: 300,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      Colors.white.withOpacity(0.1),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: -150,
-              left: -100,
-              child: Container(
-                width: 400,
-                height: 400,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      Colors.white.withOpacity(0.08),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // Main Content
-            SafeArea(
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: SlideTransition(
-                  position: _slideAnimation,
-                  child: Column(
-                    children: [
-                      // Custom App Bar
-                      _buildCustomAppBar(),
-
-                      // Tab Bar
-                      _buildGlassmorphicTabBar(),
-
-                      // Content
-                      Expanded(
-                        child: TabBarView(
-                          children: [
-                            _buildPostedRides(),
-                            _buildAcceptedRides(),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildCustomAppBar() {
+  Widget _buildAppBar() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      color: kNavy,
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 8,
+        left: 16,
+        right: 16,
+        bottom: 12,
+      ),
       child: Row(
         children: [
-          // Back Button
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.2),
-                width: 1,
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
               ),
-            ),
-            child: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () => Navigator.pop(context),
-            ),
-          ),
-          const SizedBox(width: 16),
-
-          // Car Icon
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.2),
-                width: 1,
-              ),
-            ),
-            child: const Icon(
-              Icons.directions_car,
-              color: Colors.white,
-              size: 24,
+              child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
             ),
           ),
           const SizedBox(width: 12),
-
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: kYellow,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.directions_car, color: kNavy, size: 18),
+          ),
+          const SizedBox(width: 10),
           const Text(
             "Your Rides",
             style: TextStyle(
               color: Colors.white,
-              fontSize: 22,
+              fontSize: 20,
               fontWeight: FontWeight.bold,
-              letterSpacing: 0.5,
             ),
           ),
         ],
@@ -682,67 +520,82 @@ class _YourRidesPageState extends State<YourRidesPage>
     );
   }
 
-  Widget _buildGlassmorphicTabBar() {
+  Widget _buildTabBar() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.2),
-          width: 1.5,
+      color: kNavy,
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F1826),
+          borderRadius: BorderRadius.circular(14),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 20,
-            spreadRadius: 2,
+        padding: const EdgeInsets.all(4),
+        child: TabBar(
+          controller: _tabController,
+          indicator: BoxDecoration(
+            color: kYellow,
+            borderRadius: BorderRadius.circular(10),
           ),
-        ],
-      ),
-      child: TabBar(
-        indicator: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+          indicatorSize: TabBarIndicatorSize.tab,
+          dividerColor: Colors.transparent,
+          labelColor: kNavy,
+          unselectedLabelColor: Colors.white,
+          labelStyle:
+          const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+          unselectedLabelStyle: const TextStyle(fontSize: 14),
+          tabs: const [
+            Tab(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.post_add, size: 16),
+                  SizedBox(width: 6),
+                  Text("Posted"),
+                ],
+              ),
+            ),
+            Tab(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.check_circle, size: 16),
+                  SizedBox(width: 6),
+                  Text("Accepted"),
+                ],
+              ),
             ),
           ],
         ),
-        indicatorSize: TabBarIndicatorSize.tab,
-        dividerColor: Colors.transparent,
-        labelColor: const Color(0xFF1E3C72),
-        unselectedLabelColor: Colors.white,
-        labelStyle: const TextStyle(
-          fontSize: 15,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 0.5,
-        ),
-        tabs: const [
-          Tab(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.post_add, size: 18),
-                SizedBox(width: 6),
-                Text("Posted"),
+      ),
+    );
+  }
+
+  Widget _emptyState(IconData icon, String title, String subtitle) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.06),
+                  blurRadius: 16,
+                ),
               ],
             ),
+            child: Icon(icon, size: 48, color: kNavy),
           ),
-          Tab(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.check_circle, size: 18),
-                SizedBox(width: 6),
-                Text("Accepted"),
-              ],
-            ),
-          ),
+          const SizedBox(height: 20),
+          Text(title,
+              style: const TextStyle(
+                  color: kNavy, fontSize: 17, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          Text(subtitle,
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 14)),
         ],
       ),
     );
@@ -757,81 +610,30 @@ class _YourRidesPageState extends State<YourRidesPage>
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(
-            child: CircularProgressIndicator(
-              color: Colors.white.withOpacity(0.8),
-            ),
-          );
+          return const Center(child: CircularProgressIndicator(color: kNavy));
         }
-
         if (snapshot.hasError) {
-          return Center(
-            child: Text(
-              "Error: ${snapshot.error}",
-              style: const TextStyle(color: Colors.white),
-            ),
-          );
+          return Center(child: Text("Error: ${snapshot.error}"));
         }
-
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.2),
-                      width: 2,
-                    ),
-                  ),
-                  child: Icon(
-                    Icons.directions_car_outlined,
-                    size: 64,
-                    color: Colors.white.withOpacity(0.7),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  "No posted rides yet",
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  "Tap + to post a ride!",
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.7),
-                    fontSize: 15,
-                  ),
-                ),
-              ],
-            ),
-          );
+          return _emptyState(Icons.directions_car_outlined,
+              "No posted rides yet", "Tap + to post a ride!");
         }
 
         final rides = snapshot.data!.docs;
-
         return ListView.builder(
           padding: const EdgeInsets.all(16),
           itemCount: rides.length,
           itemBuilder: (context, index) {
-            final rideData = rides[index].data() as Map<String, dynamic>? ?? {};
+            final rideData =
+                rides[index].data() as Map<String, dynamic>? ?? {};
             final status = (rideData['status'] ?? 'pending').toString();
             final rideId = rides[index].id;
-
             final acceptedBy = rideData['acceptedBy'];
             final acceptedByList =
             List<String>.from(rideData['acceptedByList'] ?? []);
             final hasAnyAcceptances =
                 acceptedBy != null || acceptedByList.isNotEmpty;
-
             final totalSeats = rideData['seats'] ?? 0;
             final remainingSeats = rideData['remainingSeats'] ?? totalSeats;
 
@@ -860,102 +662,38 @@ class _YourRidesPageState extends State<YourRidesPage>
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(
-            child: CircularProgressIndicator(
-              color: Colors.white.withOpacity(0.8),
-            ),
-          );
+          return const Center(child: CircularProgressIndicator(color: kNavy));
         }
-
         if (snapshot.hasError) {
-          return Center(
-            child: Text(
-              "Error: ${snapshot.error}",
-              style: const TextStyle(color: Colors.white),
-            ),
-          );
+          return Center(child: Text("Error: ${snapshot.error}"));
         }
-
         if (!snapshot.hasData) {
-          return const Center(
-            child: Text(
-              "No data available",
-              style: TextStyle(color: Colors.white),
-            ),
-          );
+          return _emptyState(Icons.car_rental_outlined,
+              "No accepted rides yet", "Browse available rides!");
         }
 
         final rides = snapshot.data!.docs.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
           final status = (data['status'] ?? '').toString();
-
-          if (![
-            'pending',
-            'accepted',
-            'tracking',
-            'in_progress',
-            'completed',
-            'cancelled'
-          ].contains(status)) {
-            return false;
-          }
-
+          if (!['pending', 'accepted', 'tracking', 'in_progress', 'completed', 'cancelled']
+              .contains(status)) return false;
           final riderId = widget.userId;
           final acceptedBy = data['acceptedBy'];
-          final acceptedByList =
-          List<String>.from(data['acceptedByList'] ?? []);
-
+          final acceptedByList = List<String>.from(data['acceptedByList'] ?? []);
           return acceptedBy == riderId || acceptedByList.contains(riderId);
         }).toList();
 
         if (rides.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.2),
-                      width: 2,
-                    ),
-                  ),
-                  child: Icon(
-                    Icons.car_rental_outlined,
-                    size: 64,
-                    color: Colors.white.withOpacity(0.7),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  "No accepted rides yet",
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  "Browse available rides!",
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.7),
-                    fontSize: 15,
-                  ),
-                ),
-              ],
-            ),
-          );
+          return _emptyState(Icons.car_rental_outlined,
+              "No accepted rides yet", "Browse available rides!");
         }
 
         return ListView.builder(
           padding: const EdgeInsets.all(16),
           itemCount: rides.length,
           itemBuilder: (context, index) {
-            final rideData = rides[index].data() as Map<String, dynamic>? ?? {};
+            final rideData =
+                rides[index].data() as Map<String, dynamic>? ?? {};
             final status = (rideData['status'] ?? 'pending').toString();
             final rideId = rides[index].id;
             final postedByName = rideData['postedByName'] ?? 'Unknown';
@@ -985,225 +723,192 @@ class _YourRidesPageState extends State<YourRidesPage>
     dynamic acceptedBy,
     String? postedByName,
   }) {
+    Color accentColor;
+    if (status == 'completed') {
+      accentColor = Colors.green;
+    } else if (status == 'cancelled') {
+      accentColor = Colors.redAccent;
+    } else {
+      accentColor = kYellow;
+    }
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
-        color: status == "completed"
-            ? Colors.green.withOpacity(0.15)
-            : status == "cancelled"
-            ? Colors.red.withOpacity(0.15)
-            : Colors.white.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.3),
-          width: 1.5,
-        ),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 15,
-            offset: const Offset(0, 4),
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // From Location
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.trip_origin,
-                    color: Colors.greenAccent,
-                    size: 18,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    rideData['from'] ?? 'Unknown',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-              ],
+      child: Column(
+        children: [
+          // Colored top bar
+          Container(
+            height: 4,
+            decoration: BoxDecoration(
+              color: accentColor,
+              borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(16)),
             ),
-            const SizedBox(height: 10),
+          ),
 
-            // To Location
-            Row(
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.location_on,
-                    color: Colors.redAccent,
-                    size: 18,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    rideData['to'] ?? 'Unknown',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Status and Seats
-            Row(
-              children: [
-                _buildStatusChip(status, rideData),
-                const SizedBox(width: 10),
-                if (isPoster)
-                  Container(
-                    padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.3),
-                        width: 1,
-                      ),
-                    ),
-                    child: Text(
-                      "$remainingSeats/$totalSeats seats",
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.white.withOpacity(0.9),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  )
-                else
-                  Container(
-                    padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.3),
-                        width: 1,
-                      ),
-                    ),
-                    child: Text(
-                      "${rideData['seats'] ?? 0} seats",
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.white.withOpacity(0.9),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 8),
-
-            // Driver Name (for accepted rides)
-            if (!isPoster && postedByName != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Row(
+                // Route
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      Icons.person,
-                      size: 14,
-                      color: Colors.white.withOpacity(0.7),
+                    Column(
+                      children: [
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                                color: const Color(0xFF4CAF50), width: 2),
+                          ),
+                        ),
+                        Container(
+                            width: 2, height: 22, color: Colors.grey.shade200),
+                        const Icon(Icons.location_on,
+                            color: Colors.redAccent, size: 14),
+                      ],
                     ),
-                    const SizedBox(width: 6),
-                    Text(
-                      "Driver: $postedByName",
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.white.withOpacity(0.9),
-                        fontWeight: FontWeight.w500,
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            rideData['from'] ?? 'Unknown',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: kNavy,
+                                fontSize: 15),
+                          ),
+                          const SizedBox(height: 14),
+                          Text(
+                            rideData['to'] ?? 'Unknown',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: kNavy,
+                                fontSize: 15),
+                          ),
+                        ],
+                      ),
+                    ),
+                    _buildStatusChip(status, rideData),
+                  ],
+                ),
+
+                const SizedBox(height: 12),
+                Container(height: 1, color: Colors.grey.shade100),
+                const SizedBox(height: 10),
+
+                // Meta row
+                Row(
+                  children: [
+                    // Seats
+                    _MetaChip(
+                      icon: Icons.event_seat_outlined,
+                      label: isPoster
+                          ? "$remainingSeats/$totalSeats seats"
+                          : "${rideData['seats'] ?? 0} seats",
+                    ),
+                    const SizedBox(width: 8),
+                    // Time
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Icon(Icons.access_time,
+                              size: 13, color: Colors.grey.shade500),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              _formatDateTime(rideData['dateTime']),
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.grey.shade500),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-              ),
 
-            // Departure Time
-            Row(
-              children: [
-                Icon(
-                  Icons.access_time,
-                  size: 14,
-                  color: Colors.white.withOpacity(0.7),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  _formatDateTime(rideData['dateTime']),
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.white.withOpacity(0.7),
+                // Driver name (for accepted rides)
+                if (!isPoster && postedByName != null) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: BoxDecoration(
+                          color: kYellow.withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.person, size: 12, color: kNavy),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        "Driver: $postedByName",
+                        style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                ],
+
+                // Acceptance count
+                if (isPoster && hasAnyAcceptances) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.check_circle,
+                          size: 13, color: Colors.green),
+                      const SizedBox(width: 5),
+                      Text(
+                        "${(acceptedByList?.length ?? 0) + (acceptedBy != null ? 1 : 0)} accepted",
+                        style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.green,
+                            fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ],
+
+                const SizedBox(height: 12),
+
+                // Action buttons
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _buildActionButtons(
+                    status: status,
+                    rideId: rideId,
+                    rideData: rideData,
+                    isPoster: isPoster,
+                    hasAnyAcceptances: hasAnyAcceptances,
                   ),
                 ),
               ],
             ),
-
-            // Acceptance Info
-            if (isPoster && hasAnyAcceptances) ...[
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Icon(
-                    Icons.check_circle,
-                    size: 14,
-                    color: Colors.greenAccent.withOpacity(0.8),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    "${(acceptedByList?.length ?? 0) + (acceptedBy != null ? 1 : 0)} accepted",
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.greenAccent.withOpacity(0.9),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-
-            const SizedBox(height: 12),
-
-            // Action Buttons
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _buildActionButtons(
-                status: status,
-                rideId: rideId,
-                rideData: rideData,
-                isPoster: isPoster,
-                hasAnyAcceptances: hasAnyAcceptances,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1217,50 +922,46 @@ class _YourRidesPageState extends State<YourRidesPage>
   }) {
     List<Widget> buttons = [];
 
-// Start Ride Button (opens RideActivePage which gates Chat + Track)
-    if ((isPoster && (['accepted', 'in_progress', 'tracking'].contains(status) || hasAnyAcceptances)) ||
+    if ((isPoster &&
+        (['accepted', 'in_progress', 'tracking'].contains(status) ||
+            hasAnyAcceptances)) ||
         (!isPoster && ['accepted', 'in_progress', 'tracking'].contains(status))) {
-      buttons.add(
-        _buildActionButton(
-          icon: Icons.rocket_launch_rounded,
-          label: status == 'accepted' ? "Start Ride" : "Active Ride",
-          color: const Color(0xFF7C3AED),
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => RideActivePage(
-                rideId: rideId,
-                userId: widget.userId,
-                isDriver: isPoster,
-              ),
+      buttons.add(_buildActionButton(
+        icon: Icons.rocket_launch_rounded,
+        label: status == 'accepted' ? "Start Ride" : "Active Ride",
+        color: kNavy,
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => RideActivePage(
+              rideId: rideId,
+              userId: widget.userId,
+              isDriver: isPoster,
             ),
           ),
         ),
-      );
-    }
-    // Cancel Button
-    if ((isPoster && ['pending', 'accepted', 'tracking'].contains(status)) ||
-        (!isPoster && ['accepted', 'pending'].contains(status))) {
-      buttons.add(
-        _buildActionButton(
-          icon: Icons.cancel,
-          label: "Cancel",
-          color: Colors.red,
-          onPressed: () => _cancelRide(rideId, isPoster),
-        ),
-      );
+      ));
     }
 
-    // Done Button
+    if ((isPoster && ['pending', 'accepted', 'tracking'].contains(status)) ||
+        (!isPoster && ['accepted', 'pending'].contains(status))) {
+      buttons.add(_buildActionButton(
+        icon: Icons.cancel_outlined,
+        label: "Cancel",
+        color: Colors.redAccent,
+        isOutlined: true,
+        onPressed: () => _cancelRide(rideId, isPoster),
+      ));
+    }
+
     if (['accepted', 'tracking'].contains(status)) {
-      buttons.add(
-        _buildActionButton(
-          icon: Icons.check_circle,
-          label: "Done",
-          color: Colors.green,
-          onPressed: () => _markRideCompleted(rideId, isPoster),
-        ),
-      );
+      buttons.add(_buildActionButton(
+        icon: Icons.check_circle_outline,
+        label: "Done",
+        color: Colors.green,
+        isOutlined: true,
+        onPressed: () => _markRideCompleted(rideId, isPoster),
+      ));
     }
 
     return buttons;
@@ -1271,45 +972,65 @@ class _YourRidesPageState extends State<YourRidesPage>
     required String label,
     required Color color,
     required VoidCallback onPressed,
+    bool isOutlined = false,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [color, color.withOpacity(0.7)],
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          color: isOutlined ? color.withOpacity(0.08) : color,
+          borderRadius: BorderRadius.circular(10),
+          border: isOutlined ? Border.all(color: color.withOpacity(0.4)) : null,
         ),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.3),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 15, color: isOutlined ? color : Colors.white),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                color: isOutlined ? color : Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Reusable meta chip ────────────────────────────────────────────────────────
+
+class _MetaChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _MetaChip({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A2340).withOpacity(0.07),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: const Color(0xFF1A2340)),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF1A2340),
+                fontWeight: FontWeight.w600),
           ),
         ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onPressed,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 16, color: Colors.white),
-                const SizedBox(width: 6),
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }

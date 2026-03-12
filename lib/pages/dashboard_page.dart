@@ -23,29 +23,19 @@ class _DashboardPageState extends State<DashboardPage>
   int selectedIndex = 0;
   DateTime? _lastBackPressed;
 
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
+  // Brand colors matching screenshot
+  static const Color kNavy = Color(0xFF1A2340);
+  static const Color kYellow = Color(0xFFFFCC00);
+  static const Color kBackground = Color(0xFFEEF0F5);
+  static const Color kCard = Colors.white;
+
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
-    );
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.1),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOutCubic,
-    ));
-    _animationController.forward();
+    _tabController = TabController(length: 2, vsync: this);
   }
 
   void _loadUserData() async {
@@ -67,7 +57,7 @@ class _DashboardPageState extends State<DashboardPage>
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1E3C72).withOpacity(0.95),
+        backgroundColor: kNavy,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text(
           "Logout",
@@ -80,14 +70,13 @@ class _DashboardPageState extends State<DashboardPage>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel",
-                style: TextStyle(color: Colors.white70)),
+            child: const Text("Cancel", style: TextStyle(color: Colors.white70)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: const Color(0xFF1E3C72),
+              backgroundColor: kYellow,
+              foregroundColor: kNavy,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -126,12 +115,10 @@ class _DashboardPageState extends State<DashboardPage>
               color: Colors.white,
             ),
             const SizedBox(width: 12),
-            Expanded(
-                child: Text(msg, style: const TextStyle(fontSize: 15))),
+            Expanded(child: Text(msg, style: const TextStyle(fontSize: 15))),
           ],
         ),
-        backgroundColor:
-        isError ? const Color(0xFFE53935) : const Color(0xFF43A047),
+        backgroundColor: isError ? const Color(0xFFE53935) : const Color(0xFF43A047),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.all(16),
@@ -142,7 +129,7 @@ class _DashboardPageState extends State<DashboardPage>
 
   @override
   void dispose() {
-    _animationController.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
@@ -173,155 +160,87 @@ class _DashboardPageState extends State<DashboardPage>
           SystemNavigator.pop();
         }
       },
-      child: DefaultTabController(
-        length: 2,
-        child: Scaffold(
-          body: Stack(
+      child: Scaffold(
+        backgroundColor: kBackground,
+        drawer: _buildModernDrawer(),
+        body: Column(
+          children: [
+            _buildAppBar(),
+            _buildTabBar(),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  PostRidePage(),
+                  FindRideWidget(userId: user.uid),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAppBar() {
+    return Container(
+      color: kNavy,
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 8,
+        left: 16,
+        right: 16,
+        bottom: 12,
+      ),
+      child: Row(
+        children: [
+          Builder(
+            builder: (context) => GestureDetector(
+              onTap: () => Scaffold.of(context).openDrawer(),
+              child: const Icon(Icons.menu, color: Colors.white, size: 26),
+            ),
+          ),
+          const Spacer(),
+          Row(
             children: [
-              // Gradient Background
               Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFF1E3C72),
-                      Color(0xFF2A5298),
-                      Color(0xFF7E22CE),
-                    ],
-                  ),
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: kYellow,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.directions_car_filled,
+                  color: kNavy,
+                  size: 20,
                 ),
               ),
-
-              // Animated Background Circles
-              Positioned(
-                top: -100,
-                right: -100,
-                child: Container(
-                  width: 300,
-                  height: 300,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        Colors.white.withOpacity(0.1),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                bottom: -150,
-                left: -100,
-                child: Container(
-                  width: 400,
-                  height: 400,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        Colors.white.withOpacity(0.08),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-
-              // Main Content
-              SafeArea(
-                child: FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: SlideTransition(
-                    position: _slideAnimation,
-                    child: Column(
-                      children: [
-                        _buildCustomAppBar(),
-                        _buildGlassmorphicTabBar(),
-                        Expanded(
-                          child: TabBarView(
-                            children: [
-                              PostRidePage(),
-                              FindRideWidget(userId: user.uid),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+              const SizedBox(width: 8),
+              const Text(
+                "GharTak",
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  letterSpacing: 0.5,
                 ),
               ),
             ],
           ),
-          drawer: _buildModernDrawer(),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCustomAppBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          Builder(
-            builder: (context) => Container(
+          const Spacer(),
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => ProfilePage()),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.2),
-                  width: 1,
-                ),
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: IconButton(
-                icon: const Icon(Icons.menu, color: Colors.white),
-                onPressed: () => Scaffold.of(context).openDrawer(),
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white.withOpacity(0.15),
-            ),
-            child: const Icon(
-              Icons.directions_car_rounded,
-              color: Colors.white,
-              size: 28,
-            ),
-          ),
-          const SizedBox(width: 12),
-          const Text(
-            "GharTak",
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-              letterSpacing: 1,
-            ),
-          ),
-          const Spacer(),
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.2),
-                width: 1,
-              ),
-            ),
-            child: IconButton(
-              icon: const Icon(Icons.person, color: Colors.white),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => ProfilePage()),
-                );
-              },
+              child: const Icon(Icons.person, color: Colors.white, size: 22),
             ),
           ),
         ],
@@ -329,174 +248,109 @@ class _DashboardPageState extends State<DashboardPage>
     );
   }
 
-  Widget _buildGlassmorphicTabBar() {
+  Widget _buildTabBar() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.2),
-          width: 1.5,
+      color: kNavy,
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F1826),
+          borderRadius: BorderRadius.circular(14),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 20,
-            spreadRadius: 2,
+        padding: const EdgeInsets.all(4),
+        child: TabBar(
+          controller: _tabController,
+          onTap: _onTabChanged,
+          indicator: BoxDecoration(
+            color: kYellow,
+            borderRadius: BorderRadius.circular(10),
           ),
-        ],
-      ),
-      child: TabBar(
-        onTap: _onTabChanged,
-        indicator: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+          indicatorSize: TabBarIndicatorSize.tab,
+          dividerColor: Colors.transparent,
+          labelColor: kNavy,
+          unselectedLabelColor: Colors.white,
+          labelStyle: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.3,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+          ),
+          tabs: const [
+            Tab(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.directions_car_filled, size: 18),
+                  SizedBox(width: 6),
+                  Text("Post Ride"),
+                ],
+              ),
+            ),
+            Tab(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.search, size: 18),
+                  SizedBox(width: 6),
+                  Text("Find Ride"),
+                ],
+              ),
             ),
           ],
         ),
-        indicatorSize: TabBarIndicatorSize.tab,
-        dividerColor: Colors.transparent,
-        labelColor: const Color(0xFF1E3C72),
-        unselectedLabelColor: Colors.white,
-        labelStyle: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 0.5,
-        ),
-        unselectedLabelStyle: const TextStyle(
-          fontSize: 15,
-          fontWeight: FontWeight.w500,
-        ),
-        tabs: const [
-          Tab(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.add_circle_outline, size: 20),
-                SizedBox(width: 8),
-                Text("Post Ride"),
-              ],
-            ),
-          ),
-          Tab(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.search, size: 20),
-                SizedBox(width: 8),
-                Text("Find Ride"),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
 
   Widget _buildModernDrawer() {
     return Drawer(
-      backgroundColor: const Color(0xFF1E3C72),
-      child: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF1E3C72),
-              Color(0xFF2A5298),
-              Color(0xFF7E22CE),
-            ],
-          ),
-        ),
+      backgroundColor: kNavy,
+      child: SafeArea(
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
             Container(
-              padding: const EdgeInsets.fromLTRB(24, 60, 24, 32),
+              padding: const EdgeInsets.fromLTRB(24, 32, 24, 28),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(4),
+                    padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
+                      color: kYellow,
                       shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.15),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.3),
-                        width: 2,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 15,
-                          spreadRadius: 2,
-                        ),
-                      ],
                     ),
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white.withOpacity(0.2),
-                      ),
-                      child: const Icon(
-                        Icons.person,
-                        size: 40,
-                        color: Colors.white,
-                      ),
-                    ),
+                    child: const Icon(Icons.person, size: 36, color: kNavy),
                   ),
                   const SizedBox(height: 16),
                   Text(
                     "Welcome,",
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
-                      fontSize: 14,
-                      letterSpacing: 0.5,
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 13,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
                     userName,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 24,
+                      fontSize: 22,
                       fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.3),
-                        width: 1,
-                      ),
-                    ),
-                    child: Text(
-                      "MENU",
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.9),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 1.2,
-                      ),
                     ),
                   ),
                 ],
               ),
             ),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Divider(color: Colors.white.withOpacity(0.1), thickness: 1),
+            ),
+            const SizedBox(height: 8),
 
             _buildDrawerItem(
               icon: Icons.person_outline,
@@ -517,8 +371,7 @@ class _DashboardPageState extends State<DashboardPage>
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) =>
-                        YourRidesPage(userId: _auth.currentUser!.uid),
+                    builder: (_) => YourRidesPage(userId: _auth.currentUser!.uid),
                   ),
                 );
               },
@@ -531,8 +384,7 @@ class _DashboardPageState extends State<DashboardPage>
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) =>
-                        SavedRoutesPage(userId: _auth.currentUser!.uid),
+                    builder: (_) => SavedRoutesPage(userId: _auth.currentUser!.uid),
                   ),
                 );
               },
@@ -547,11 +399,8 @@ class _DashboardPageState extends State<DashboardPage>
             ),
 
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              child: Divider(
-                color: Colors.white.withOpacity(0.3),
-                thickness: 1,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              child: Divider(color: Colors.white.withOpacity(0.1), thickness: 1),
             ),
 
             _buildDrawerItem(
@@ -561,24 +410,26 @@ class _DashboardPageState extends State<DashboardPage>
               isDestructive: true,
             ),
 
-            const SizedBox(height: 32),
+            const SizedBox(height: 40),
 
-            Padding(
-              padding: const EdgeInsets.all(24),
+            Center(
               child: Column(
                 children: [
-                  Icon(
-                    Icons.directions_car_rounded,
-                    color: Colors.white.withOpacity(0.4),
-                    size: 32,
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: kYellow,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.directions_car_filled,
+                        color: kNavy, size: 20),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     "GharTak v1.0",
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.5),
+                      color: Colors.white.withOpacity(0.4),
                       fontSize: 12,
-                      letterSpacing: 0.5,
                     ),
                   ),
                 ],
@@ -597,51 +448,29 @@ class _DashboardPageState extends State<DashboardPage>
     bool isDestructive = false,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.1),
-            width: 1,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+      child: ListTile(
+        onTap: onTap,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        leading: Icon(
+          icon,
+          color: isDestructive ? Colors.redAccent : Colors.white70,
+          size: 22,
+        ),
+        title: Text(
+          title,
+          style: TextStyle(
+            color: isDestructive ? Colors.redAccent : Colors.white,
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
           ),
         ),
-        child: ListTile(
-          leading: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: isDestructive
-                  ? Colors.red.withOpacity(0.2)
-                  : Colors.white.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              icon,
-              color: isDestructive ? Colors.redAccent : Colors.white,
-              size: 22,
-            ),
-          ),
-          title: Text(
-            title,
-            style: TextStyle(
-              color: isDestructive ? Colors.redAccent : Colors.white,
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              letterSpacing: 0.3,
-            ),
-          ),
-          trailing: Icon(
-            Icons.arrow_forward_ios,
-            color: isDestructive
-                ? Colors.redAccent.withOpacity(0.5)
-                : Colors.white.withOpacity(0.5),
-            size: 16,
-          ),
-          onTap: onTap,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+        trailing: Icon(
+          Icons.arrow_forward_ios,
+          color: isDestructive
+              ? Colors.redAccent.withOpacity(0.5)
+              : Colors.white.withOpacity(0.3),
+          size: 14,
         ),
       ),
     );

@@ -6,6 +6,25 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'chat_page.dart';
 import 'live_ride_tracking_page.dart';
 import 'rating_dialog.dart';
+import 'upi_payment_page.dart';
+
+// ── Theme ──────────────────────────────────────────────────────────────────
+class T {
+  static const bg        = Color(0xFFE8EAF0);
+  static const surface   = Color(0xFF1C2340);
+  static const card      = Color(0xFFFFFFFF);
+  static const navyCard  = Color(0xFF1E2D5A);
+  static const yellow    = Color(0xFFFFCC00);
+  static const yellowDim = Color(0x33FFCC00);
+  static const txtDark   = Color(0xFF1A1A2E);
+  static const txtMed    = Color(0xFF555577);
+  static const txtLight  = Color(0xFF9999BB);
+  static const txtWhite  = Color(0xFFFFFFFF);
+  static const green     = Color(0xFF22C55E);
+  static const red       = Color(0xFFFF3D3D);
+  static const border    = Color(0xFFDDDDE8);
+  static const shadow    = Color(0x14000000);
+}
 
 class RideActivePage extends StatefulWidget {
   final String rideId;
@@ -52,7 +71,7 @@ class _RideActivePageState extends State<RideActivePage>
       vsync: this,
       duration: const Duration(milliseconds: 1400),
     )..repeat(reverse: true);
-    _pulseAnim = Tween<double>(begin: 0.95, end: 1.05).animate(
+    _pulseAnim = Tween<double>(begin: 0.97, end: 1.03).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
@@ -79,34 +98,27 @@ class _RideActivePageState extends State<RideActivePage>
     _pulseController.dispose();
     _unlockController.dispose();
     _shakeController.dispose();
-    for (final c in _pinControllers) {
-      c.dispose();
-    }
-    for (final f in _pinFocusNodes) {
-      f.dispose();
-    }
+    for (final c in _pinControllers) c.dispose();
+    for (final f in _pinFocusNodes) f.dispose();
     super.dispose();
   }
 
-  // ── Init: generate or fetch code ───────────────────────────────────────────
+  // ── Init ───────────────────────────────────────────────────────────────────
   Future<void> _initRide() async {
     final doc = await FirebaseFirestore.instance
         .collection('rides')
         .doc(widget.rideId)
         .get();
-
     if (!doc.exists || !mounted) return;
     final data = doc.data()!;
     setState(() => _rideData = data);
 
-    // Check if already verified
-    if (data['rideStarted'] == true) {
+    if (data['rideStarted'] == true && data['paymentStatus'] == 'confirmed') {
       setState(() => _isVerified = true);
       _unlockController.forward();
       return;
     }
 
-    // Driver generates code if not already set
     if (widget.isDriver && data['rideCode'] == null) {
       final code = _generateCode();
       await FirebaseFirestore.instance
@@ -124,15 +136,12 @@ class _RideActivePageState extends State<RideActivePage>
     return (1000 + rand.nextInt(9000)).toString();
   }
 
-  // ── Verify code (rider submits) ────────────────────────────────────────────
+  // ── Verify ─────────────────────────────────────────────────────────────────
   Future<void> _verifyCode() async {
     final entered = _pinControllers.map((c) => c.text).join();
     if (entered.length < 4) return;
 
-    setState(() {
-      _isVerifying = true;
-      _errorText = null;
-    });
+    setState(() { _isVerifying = true; _errorText = null; });
 
     final doc = await FirebaseFirestore.instance
         .collection('rides')
@@ -142,23 +151,38 @@ class _RideActivePageState extends State<RideActivePage>
     final storedCode = doc.data()?['rideCode']?.toString();
 
     if (storedCode == entered) {
+      HapticFeedback.heavyImpact();
+
+      final data = doc.data()!;
+      final driverUPI = data['driverUPI'] as String?;
+      final fare = (data['estimatedCost'] ?? 0).toDouble();
+
+      if (driverUPI != null && driverUPI.isNotEmpty && fare > 0) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => UpiPaymentPage(
+              rideId: widget.rideId,
+              amount: fare,
+              driverUpiId: driverUPI,
+              driverName: data['postedByName'] ?? 'Driver',
+              riderId: widget.userId,
+            ),
+          ),
+        );
+      }
+
       await FirebaseFirestore.instance
           .collection('rides')
           .doc(widget.rideId)
-          .update({'rideStarted': true, 'status': 'in_progress'});
+          .update({'paymentStatus': 'awaiting_confirmation'});
 
-      HapticFeedback.heavyImpact();
-      setState(() {
-        _isVerified = true;
-        _isVerifying = false;
-      });
-      _unlockController.forward();
+      setState(() => _isVerifying = false);
+      _showSuccess("Payment sent! Waiting for driver to confirm...");
     } else {
       HapticFeedback.vibrate();
       _shakeController.forward(from: 0);
-      for (final c in _pinControllers) {
-        c.clear();
-      }
+      for (final c in _pinControllers) c.clear();
       _pinFocusNodes[0].requestFocus();
       setState(() {
         _errorText = 'Wrong code. Ask your driver again.';
@@ -177,108 +201,113 @@ class _RideActivePageState extends State<RideActivePage>
   }
 
   void _openTracking() {
-    final startLat = _getDouble(_rideData['from_lat']);
-    final startLng = _getDouble(_rideData['from_lng'], isLat: false);
-    final destLat = _getDouble(_rideData['to_lat']);
-    final destLng = _getDouble(_rideData['to_lng'], isLat: false);
-
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => LiveRideTrackingPage(
           rideId: widget.rideId,
-          startLat: startLat,
-          startLng: startLng,
-          destLat: destLat,
-          destLng: destLng,
+          startLat: _getDouble(_rideData['from_lat']),
+          startLng: _getDouble(_rideData['from_lng'], isLat: false),
+          destLat: _getDouble(_rideData['to_lat']),
+          destLng: _getDouble(_rideData['to_lng'], isLat: false),
           isDriver: widget.isDriver,
         ),
       ),
     );
   }
+  Future<void> _confirmPayment() async {
+    await FirebaseFirestore.instance
+        .collection('rides')
+        .doc(widget.rideId)
+        .update({
+      'paymentStatus': 'confirmed',
+      'rideStarted': true,
+      'status': 'in_progress',
+      'paymentConfirmedAt': FieldValue.serverTimestamp(),
+    });
+    _showSuccess("Payment confirmed! Ride started 🎉");
+  }
 
+  Widget _buildRiderWaitingOrPinPanel() {
+    final status = _rideData['paymentStatus'] as String? ?? 'pending';
+    if (status == 'awaiting_confirmation') {
+      return _surfaceCard(
+        child: Column(children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: T.yellowDim,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: T.yellow.withOpacity(0.5)),
+            ),
+            child: const Icon(Icons.hourglass_top_rounded, color: T.yellow, size: 28),
+          ),
+          const SizedBox(height: 16),
+          const Text("Payment Sent! 🎉",
+              style: TextStyle(color: T.txtDark, fontSize: 18, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 8),
+          const Text(
+            "Waiting for your driver to confirm payment.\nRide will start automatically once confirmed.",
+            textAlign: TextAlign.center,
+            style: TextStyle(color: T.txtMed, fontSize: 13, height: 1.5),
+          ),
+          const SizedBox(height: 20),
+          _waitingIndicator("Waiting for driver confirmation..."),
+        ]),
+      );
+    }
+    return _buildRiderPinPanel();
+  }
   void _openChat() {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => ChatPage(rideId: widget.rideId)),
     );
   }
-
-  // ── Build ──────────────────────────────────────────────────────────────────
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
+  Widget _buildPreRideActions() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: T.navyCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: T.yellow.withOpacity(0.4)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          // Background gradient
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF1E3C72),
-                  Color(0xFF2A5298),
-                  Color(0xFF7E22CE),
-                ],
-              ),
+
+          // CHAT
+          GestureDetector(
+            onTap: _openChat,
+            child: Column(
+              children: const [
+                Icon(Icons.chat_bubble_rounded, color: T.yellow, size: 26),
+                SizedBox(height: 6),
+                Text(
+                  "Chat",
+                  style: TextStyle(
+                    color: T.txtWhite,
+                    fontWeight: FontWeight.w700,
+                  ),
+                )
+              ],
             ),
           ),
 
-          // Decorative circles
-          Positioned(
-            top: -80,
-            right: -80,
-            child: _decorCircle(260, 0.08),
-          ),
-          Positioned(
-            bottom: -120,
-            left: -80,
-            child: _decorCircle(340, 0.06),
-          ),
-
-          SafeArea(
+          // TRACK
+          GestureDetector(
+            onTap: _openTracking,
             child: Column(
-              children: [
-                _buildAppBar(),
-                Expanded(
-                  child: StreamBuilder<DocumentSnapshot>(
-                    stream: FirebaseFirestore.instance
-                        .collection('rides')
-                        .doc(widget.rideId)
-                        .snapshots(),
-                    builder: (context, snapshot) {
-                      if (snapshot.hasData && snapshot.data!.exists) {
-                        final data =
-                        snapshot.data!.data() as Map<String, dynamic>;
-                        if (data['rideStarted'] == true && !_isVerified) {
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            setState(() => _isVerified = true);
-                            _unlockController.forward();
-                          });
-                        }
-                        _rideData = data;
-                      }
-
-                      return SingleChildScrollView(
-                        physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 16),
-                        child: Column(
-                          children: [
-                            _buildRouteCard(),
-                            const SizedBox(height: 20),
-                            _isVerified
-                                ? _buildUnlockedPanel()
-                                : widget.isDriver
-                                ? _buildDriverCodePanel()
-                                : _buildRiderPinPanel(),
-                          ],
-                        ),
-                      );
-                    },
+              children: const [
+                Icon(Icons.map_rounded, color: T.yellow, size: 26),
+                SizedBox(height: 6),
+                Text(
+                  "Track",
+                  style: TextStyle(
+                    color: T.txtWhite,
+                    fontWeight: FontWeight.w700,
                   ),
-                ),
+                )
               ],
             ),
           ),
@@ -287,53 +316,118 @@ class _RideActivePageState extends State<RideActivePage>
     );
   }
 
-  // ── App Bar ────────────────────────────────────────────────────────────────
-  Widget _buildAppBar() {
-    return Padding(
+  // ── Build ──────────────────────────────────────────────────────────────────
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: T.bg,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildHeader(),
+            Expanded(
+              child: StreamBuilder<DocumentSnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('rides')
+                    .doc(widget.rideId)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasData && snapshot.data!.exists) {
+                    final data =
+                    snapshot.data!.data() as Map<String, dynamic>;
+                    if (data['paymentStatus'] == 'confirmed' && data['rideStarted'] == true && !_isVerified) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        setState(() => _isVerified = true);
+                        _unlockController.forward();
+                      });
+                    }
+                    _rideData = data;
+                  }
+
+                  return SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+                    child: Column(
+                      children: [
+                        _buildRouteCard(),
+                        const SizedBox(height: 16),
+                        Column(
+                          children: [
+                            if (!_isVerified)
+                              widget.isDriver
+                                  ? _buildDriverCodePanel()
+                                  : _buildRiderWaitingOrPinPanel(),
+
+                            // AFTER
+                            if (_rideData['rideCode'] != null && !_isVerified) ...[
+                              const SizedBox(height: 16),
+                              _buildPreRideActions(),
+                            ],
+
+                            if (_isVerified) _buildUnlockedPanel(),
+                          ],
+                        )
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Header ─────────────────────────────────────────────────────────────────
+  Widget _buildHeader() {
+    return Container(
+      color: T.surface,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          _glassButton(
-            child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+          GestureDetector(
             onTap: () => Navigator.pop(context),
-          ),
-          const SizedBox(width: 14),
-          _glassButton(
-            child: const Icon(Icons.directions_car,
-                color: Colors.white, size: 20),
-            onTap: null,
-          ),
-          const SizedBox(width: 12),
-          const Text(
-            'Active Ride',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.4,
+            child: Container(
+              width: 38, height: 38,
+              decoration: BoxDecoration(
+                color: T.card,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [BoxShadow(color: T.shadow, blurRadius: 8)],
+              ),
+              child: const Icon(Icons.arrow_back, color: T.txtDark, size: 18),
             ),
           ),
-          const Spacer(),
+          const SizedBox(width: 12),
+          const Icon(Icons.directions_car, color: T.yellow, size: 22),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              'GharTak',
+              style: TextStyle(
+                  color: T.txtWhite,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.5),
+            ),
+          ),
           if (_isVerified)
             Container(
-              padding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.25),
+                color: T.yellowDim,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                    color: Colors.greenAccent.withOpacity(0.5), width: 1.5),
+                border: Border.all(color: T.yellow, width: 1.5),
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.lock_open_rounded,
-                      size: 14, color: Colors.greenAccent),
+                  Icon(Icons.lock_open_rounded, size: 13, color: T.yellow),
                   SizedBox(width: 5),
                   Text('LIVE',
                       style: TextStyle(
-                          color: Colors.greenAccent,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
+                          color: T.yellow,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
                           letterSpacing: 1)),
                 ],
               ),
@@ -343,34 +437,30 @@ class _RideActivePageState extends State<RideActivePage>
     );
   }
 
-  // ── Route summary card ─────────────────────────────────────────────────────
+  // ── Route Card ─────────────────────────────────────────────────────────────
   Widget _buildRouteCard() {
-    return _glassCard(
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: T.navyCard,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: T.shadow, blurRadius: 8, offset: const Offset(0, 2))],
+      ),
       child: Column(
         children: [
           _routeRow(
             icon: Icons.trip_origin,
-            iconColor: Colors.greenAccent,
-            bgColor: Colors.green,
+            iconColor: T.yellow,
             label: 'From',
             value: _rideData['from'] ?? '—',
           ),
           Padding(
             padding: const EdgeInsets.only(left: 17),
-            child: Row(
-              children: [
-                Container(
-                  width: 2,
-                  height: 28,
-                  color: Colors.white24,
-                ),
-              ],
-            ),
+            child: Container(width: 2, height: 20, color: T.yellow.withOpacity(0.3)),
           ),
           _routeRow(
             icon: Icons.location_on,
-            iconColor: Colors.redAccent,
-            bgColor: Colors.red,
+            iconColor: T.red,
             label: 'To',
             value: _rideData['to'] ?? '—',
           ),
@@ -382,7 +472,6 @@ class _RideActivePageState extends State<RideActivePage>
   Widget _routeRow({
     required IconData icon,
     required Color iconColor,
-    required Color bgColor,
     required String label,
     required String value,
   }) {
@@ -391,7 +480,7 @@ class _RideActivePageState extends State<RideActivePage>
         Container(
           padding: const EdgeInsets.all(7),
           decoration: BoxDecoration(
-            color: bgColor.withOpacity(0.2),
+            color: iconColor.withOpacity(0.15),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(icon, color: iconColor, size: 18),
@@ -402,16 +491,11 @@ class _RideActivePageState extends State<RideActivePage>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(label,
-                  style: TextStyle(
-                      color: Colors.white.withOpacity(0.5),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.5)),
+                  style: const TextStyle(
+                      color: T.txtLight, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
               Text(value,
                   style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700)),
+                      color: T.txtWhite, fontSize: 14, fontWeight: FontWeight.w700)),
             ],
           ),
         ),
@@ -419,59 +503,50 @@ class _RideActivePageState extends State<RideActivePage>
     );
   }
 
-  // ── Driver: show the code ──────────────────────────────────────────────────
+  // ── Driver Code Panel ──────────────────────────────────────────────────────
   Widget _buildDriverCodePanel() {
-    return _glassCard(
+    return _surfaceCard(
       child: Column(
         children: [
+          // Title row
           Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.amber.withOpacity(0.2),
+                  color: T.yellowDim,
                   borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: T.yellow.withOpacity(0.4)),
                 ),
-                child: const Icon(Icons.key_rounded,
-                    color: Colors.amber, size: 22),
+                child: const Icon(Icons.key_rounded, color: T.yellow, size: 22),
               ),
               const SizedBox(width: 12),
               const Expanded(
-                child: Text(
-                  'Your Ride Code',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
+                child: Text('Your Ride Code',
+                    style: TextStyle(
+                        color: T.txtDark, fontSize: 18, fontWeight: FontWeight.w800)),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          Text(
-            'Share this code with your rider to start the ride.',
-            style: TextStyle(
-                color: Colors.white.withOpacity(0.65), fontSize: 13, height: 1.5),
+          const Text(
+            'Share this 4-digit code with your rider to start the ride.',
+            style: TextStyle(color: T.txtMed, fontSize: 13, height: 1.5),
           ),
           const SizedBox(height: 28),
 
-          // Pulsing code display
+          // Pulsing code
           ScaleTransition(
             scale: _pulseAnim,
             child: Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: MediaQuery.of(context).size.width < 360 ? 18 : 36,
-                vertical: 20,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 22),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFF59E0B), Color(0xFFEF4444)],
-                ),
+                color: T.surface,
                 borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: T.yellow, width: 2),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFFF59E0B).withOpacity(0.4),
+                    color: T.yellow.withOpacity(0.25),
                     blurRadius: 24,
                     spreadRadius: 2,
                   ),
@@ -479,11 +554,11 @@ class _RideActivePageState extends State<RideActivePage>
               ),
               child: Text(
                 _rideCode ?? '----',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: MediaQuery.of(context).size.width < 360 ? 38 : 52,
+                style: const TextStyle(
+                  color: T.yellow,
+                  fontSize: 52,
                   fontWeight: FontWeight.w900,
-                  letterSpacing: 8,
+                  letterSpacing: 10,
                 ),
               ),
             ),
@@ -496,92 +571,116 @@ class _RideActivePageState extends State<RideActivePage>
             onTap: () {
               Clipboard.setData(ClipboardData(text: _rideCode ?? ''));
               HapticFeedback.lightImpact();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Code copied to clipboard'),
-                  behavior: SnackBarBehavior.floating,
-                  backgroundColor: Colors.amber.shade700,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  margin: const EdgeInsets.all(16),
-                  duration: const Duration(seconds: 2),
-                ),
-              );
+              _showSuccess('Code copied to clipboard');
             },
             child: Container(
-              padding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
+                color: T.bg,
                 borderRadius: BorderRadius.circular(12),
-                border:
-                Border.all(color: Colors.white.withOpacity(0.2), width: 1),
+                border: Border.all(color: T.border, width: 1.5),
               ),
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.copy_rounded, color: Colors.white70, size: 16),
+                  Icon(Icons.copy_rounded, color: T.txtMed, size: 16),
                   SizedBox(width: 8),
                   Text('Copy Code',
-                      style: TextStyle(color: Colors.white70, fontSize: 14)),
+                      style: TextStyle(
+                          color: T.txtDark, fontSize: 13, fontWeight: FontWeight.w600)),
                 ],
               ),
             ),
           ),
 
           const SizedBox(height: 20),
-          _waitingIndicator('Waiting for rider to enter the code…'),
+          Builder(builder: (_) {
+            final status = _rideData['paymentStatus'] as String? ?? 'pending';
+            if (status == 'awaiting_confirmation') {
+              return Column(children: [
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: T.yellowDim,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: T.yellow.withOpacity(0.5)),
+                  ),
+                  child: const Row(children: [
+                    Icon(Icons.currency_rupee, color: T.yellow, size: 18),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        "Rider has paid. Check your UPI app then confirm to start the ride.",
+                        style: TextStyle(color: T.txtDark, fontSize: 13, fontWeight: FontWeight.w600, height: 1.4),
+                      ),
+                    ),
+                  ]),
+                ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: _confirmPayment,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: T.green,
+                      foregroundColor: T.txtWhite,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Icon(Icons.check_circle_rounded, size: 20, color: T.txtWhite),
+                      SizedBox(width: 10),
+                      Text("Confirm Payment Received",
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: T.txtWhite)),
+                    ]),
+                  ),
+                ),
+              ]);
+            }
+            return _waitingIndicator("Waiting for rider to enter code & pay...");
+          }),
         ],
       ),
     );
   }
 
-  // ── Rider: enter the code ─────────────────────────────────────────────────
+  // ── Rider PIN Panel ────────────────────────────────────────────────────────
   Widget _buildRiderPinPanel() {
     return AnimatedBuilder(
       animation: _shakeAnim,
       builder: (context, child) {
         final shakeOffset =
             sin(_shakeAnim.value * pi * 6) * 10 * (1 - _shakeAnim.value);
-        return Transform.translate(
-          offset: Offset(shakeOffset, 0),
-          child: child,
-        );
+        return Transform.translate(offset: Offset(shakeOffset, 0), child: child);
       },
-      child: _glassCard(
+      child: _surfaceCard(
         child: Column(
           children: [
+            // Title row
             Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.2),
+                    color: T.yellowDim,
                     borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: T.yellow.withOpacity(0.4)),
                   ),
-                  child: const Icon(Icons.lock_outline_rounded,
-                      color: Colors.lightBlueAccent, size: 22),
+                  child: const Icon(Icons.lock_outline_rounded, color: T.yellow, size: 22),
                 ),
                 const SizedBox(width: 12),
                 const Expanded(
-                  child: Text(
-                    'Enter Ride Code',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
+                  child: Text('Enter Ride Code',
+                      style: TextStyle(
+                          color: T.txtDark, fontSize: 18, fontWeight: FontWeight.w800)),
                 ),
               ],
             ),
             const SizedBox(height: 8),
-            Text(
+            const Text(
               'Ask your driver for the 4-digit code to begin the ride.',
-              style: TextStyle(
-                  color: Colors.white.withOpacity(0.65),
-                  fontSize: 13,
-                  height: 1.5),
+              style: TextStyle(color: T.txtMed, fontSize: 13, height: 1.5),
             ),
             const SizedBox(height: 28),
 
@@ -596,16 +695,11 @@ class _RideActivePageState extends State<RideActivePage>
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.error_outline,
-                      color: Colors.redAccent, size: 16),
+                  const Icon(Icons.error_outline, color: T.red, size: 16),
                   const SizedBox(width: 6),
-                  Text(
-                    _errorText!,
-                    style: const TextStyle(
-                        color: Colors.redAccent,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500),
-                  ),
+                  Text(_errorText!,
+                      style: const TextStyle(
+                          color: T.red, fontSize: 13, fontWeight: FontWeight.w500)),
                 ],
               ),
             ],
@@ -615,27 +709,32 @@ class _RideActivePageState extends State<RideActivePage>
             // Verify button
             SizedBox(
               width: double.infinity,
-              height: 52,
+              height: 54,
               child: ElevatedButton(
                 onPressed: _isVerifying ? null : _verifyCode,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6366F1),
-                  foregroundColor: Colors.white,
+                  backgroundColor: T.yellow,
+                  foregroundColor: T.txtDark,
                   elevation: 0,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  disabledBackgroundColor: T.yellow.withOpacity(0.4),
                 ),
                 child: _isVerifying
                     ? const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2.5, color: Colors.white),
-                )
-                    : const Text(
-                  'Verify & Start Ride',
-                  style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w700),
+                    width: 22, height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2.5, color: T.txtDark))
+                    : const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.verified_rounded, size: 20, color: T.txtDark),
+                    SizedBox(width: 10),
+                    Text('Verify & Start Ride',
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: T.txtDark,
+                            letterSpacing: 0.5)),
+                  ],
                 ),
               ),
             ),
@@ -647,19 +746,21 @@ class _RideActivePageState extends State<RideActivePage>
 
   Widget _buildPinBox(int index) {
     final boxSize = (MediaQuery.of(context).size.width - 120) / 4;
+    final isFocused = _pinFocusNodes[index].hasFocus;
+    final hasTxt = _pinControllers[index].text.isNotEmpty;
+
     return Container(
       width: boxSize,
       height: boxSize + 8,
-      margin: const EdgeInsets.symmetric(horizontal: 4),
+      margin: const EdgeInsets.symmetric(horizontal: 5),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.12),
+        color: hasTxt ? T.yellowDim : T.bg,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: _pinFocusNodes[index].hasFocus
-              ? Colors.lightBlueAccent
-              : Colors.white.withOpacity(0.25),
-          width: 2,
+          color: isFocused ? T.yellow : hasTxt ? T.yellow.withOpacity(0.6) : T.border,
+          width: isFocused || hasTxt ? 2 : 1.5,
         ),
+        boxShadow: [BoxShadow(color: T.shadow, blurRadius: 6, offset: const Offset(0, 2))],
       ),
       child: TextField(
         controller: _pinControllers[index],
@@ -668,22 +769,12 @@ class _RideActivePageState extends State<RideActivePage>
         keyboardType: TextInputType.number,
         maxLength: 1,
         style: const TextStyle(
-            color: Colors.white,
-            fontSize: 28,
-            fontWeight: FontWeight.w800),
-        decoration: const InputDecoration(
-          counterText: '',
-          border: InputBorder.none,
-        ),
+            color: T.txtDark, fontSize: 26, fontWeight: FontWeight.w900),
+        decoration: const InputDecoration(counterText: '', border: InputBorder.none),
         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
         onChanged: (val) {
-          if (val.isNotEmpty && index < 3) {
-            _pinFocusNodes[index + 1].requestFocus();
-          }
-          if (val.isEmpty && index > 0) {
-            _pinFocusNodes[index - 1].requestFocus();
-          }
-          // Auto verify when all filled
+          if (val.isNotEmpty && index < 3) _pinFocusNodes[index + 1].requestFocus();
+          if (val.isEmpty && index > 0) _pinFocusNodes[index - 1].requestFocus();
           if (index == 3 && val.isNotEmpty) {
             final all = _pinControllers.map((c) => c.text).join();
             if (all.length == 4) _verifyCode();
@@ -694,106 +785,101 @@ class _RideActivePageState extends State<RideActivePage>
     );
   }
 
-  // ── Unlocked panel (post-verification) ────────────────────────────────────
+  // ── Unlocked Panel ─────────────────────────────────────────────────────────
   Widget _buildUnlockedPanel() {
     return ScaleTransition(
       scale: _unlockAnim,
-      child: _glassCard(
-        borderColor: Colors.greenAccent.withOpacity(0.4),
-        child: Column(
-          children: [
-            // Success header
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                    color: Colors.greenAccent.withOpacity(0.3), width: 1.5),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.lock_open_rounded,
-                      color: Colors.greenAccent, size: 28),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Ride Started! 🎉',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 17,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          'All features are now unlocked.',
-                          style: TextStyle(
-                              color: Colors.white.withOpacity(0.65),
-                              fontSize: 13),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+      child: Column(
+        children: [
+          // Success banner
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: T.navyCard,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: T.yellow.withOpacity(0.4), width: 1.5),
+              boxShadow: [BoxShadow(color: T.shadow, blurRadius: 8, offset: const Offset(0, 2))],
             ),
-
-            const SizedBox(height: 24),
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'RIDE ACTIONS',
-                style: TextStyle(
-                  color: Colors.white54,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.5,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Action buttons grid
-            GridView.count(
-              crossAxisCount: 2,
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              childAspectRatio: (MediaQuery.of(context).size.width - 120) / 2 / 52,
+            child: Row(
               children: [
-                _buildActionTile(
-                  icon: Icons.map_rounded,
-                  label: 'Track Ride',
-                  gradient: const [Color(0xFF7C3AED), Color(0xFF4F46E5)],
-                  onTap: _openTracking,
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: T.yellowDim,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: T.yellow, width: 1.5),
+                  ),
+                  child: const Icon(Icons.lock_open_rounded, color: T.yellow, size: 24),
                 ),
-                _buildActionTile(
-                  icon: Icons.chat_bubble_rounded,
-                  label: 'Chat',
-                  gradient: const [Color(0xFF0EA5E9), Color(0xFF0284C7)],
-                  onTap: _openChat,
-                ),
-                _buildActionTile(
-                  icon: Icons.check_circle_rounded,
-                  label: 'Done',
-                  gradient: const [Color(0xFF059669), Color(0xFF10B981)],
-                  onTap: () => _showDoneDialog(),
-                ),
-                _buildActionTile(
-                  icon: Icons.cancel_rounded,
-                  label: 'Cancel',
-                  gradient: const [Color(0xFFDC2626), Color(0xFFEF4444)],
-                  onTap: () => _showCancelDialog(),
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Ride Started! 🎉',
+                          style: TextStyle(
+                              color: T.txtWhite, fontSize: 17, fontWeight: FontWeight.w800)),
+                      SizedBox(height: 3),
+                      Text('All features are now unlocked.',
+                          style: TextStyle(color: T.txtLight, fontSize: 12)),
+                    ],
+                  ),
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Section label
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: Text('RIDE ACTIONS',
+                style: TextStyle(
+                    color: T.txtMed,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.5)),
+          ),
+          const SizedBox(height: 10),
+
+          // Action grid
+          GridView.count(
+            crossAxisCount: 2,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            childAspectRatio: (MediaQuery.of(context).size.width - 52) / 2 / 62,
+            children: [
+              _buildActionTile(
+                icon: Icons.map_rounded,
+                label: 'Track Ride',
+                isYellow: true,
+                onTap: _openTracking,
+              ),
+              _buildActionTile(
+                icon: Icons.chat_bubble_rounded,
+                label: 'Chat',
+                isYellow: false,
+                onTap: _openChat,
+              ),
+              _buildActionTile(
+                icon: Icons.check_circle_rounded,
+                label: 'Complete',
+                isYellow: true,
+                onTap: _showDoneDialog,
+              ),
+              _buildActionTile(
+                icon: Icons.cancel_rounded,
+                label: 'Cancel',
+                isYellow: false,
+                isDanger: true,
+                onTap: _showCancelDialog,
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -801,18 +887,26 @@ class _RideActivePageState extends State<RideActivePage>
   Widget _buildActionTile({
     required IconData icon,
     required String label,
-    required List<Color> gradient,
     required VoidCallback onTap,
+    bool isYellow = true,
+    bool isDanger = false,
   }) {
+    final bgColor = isDanger
+        ? T.red
+        : isYellow
+        ? T.yellow
+        : T.surface;
+    final fgColor = (isYellow && !isDanger) ? T.txtDark : T.txtWhite;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(colors: gradient),
+          color: bgColor,
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
-              color: gradient.first.withOpacity(0.35),
+              color: bgColor.withOpacity(0.3),
               blurRadius: 10,
               offset: const Offset(0, 3),
             ),
@@ -821,13 +915,11 @@ class _RideActivePageState extends State<RideActivePage>
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: Colors.white, size: 20),
+            Icon(icon, color: fgColor, size: 20),
             const SizedBox(width: 8),
             Text(label,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700)),
+                style: TextStyle(
+                    color: fgColor, fontSize: 14, fontWeight: FontWeight.w800)),
           ],
         ),
       ),
@@ -838,26 +930,22 @@ class _RideActivePageState extends State<RideActivePage>
   Future<void> _showDoneDialog() async {
     final confirmed = await _confirmSheet(
       icon: Icons.check_circle_outline,
-      iconColor: Colors.greenAccent,
-      bgColor: Colors.green,
+      iconColor: T.green,
       title: 'Complete Ride?',
-      subtitle:
-      'Both parties must confirm to fully complete the ride.',
+      subtitle: 'Both parties must confirm to fully complete the ride.',
       confirmLabel: 'Yes, Complete',
-      confirmColor: Colors.greenAccent,
-      confirmTextColor: const Color(0xFF1E3C72),
+      confirmColor: T.green,
+      confirmTextColor: T.txtWhite,
     );
     if (confirmed != true || !mounted) return;
 
-    final rideRef = FirebaseFirestore.instance
-        .collection('rides')
-        .doc(widget.rideId);
+    final rideRef =
+    FirebaseFirestore.instance.collection('rides').doc(widget.rideId);
 
     await rideRef.update({
       widget.isDriver ? 'posterCompleted' : 'accepterCompleted': true,
     });
 
-    // Check if both completed → show rating dialog
     final doc = await rideRef.get();
     final data = doc.data()!;
     final bothDone = (data['posterCompleted'] ?? false) &&
@@ -870,7 +958,6 @@ class _RideActivePageState extends State<RideActivePage>
       });
     }
 
-    // Show rating for the other party
     final rateUserId = widget.isDriver
         ? (data['acceptedBy'] ?? (data['acceptedByList'] as List?)?.first)
         : data['riderId'];
@@ -889,40 +976,36 @@ class _RideActivePageState extends State<RideActivePage>
     }
 
     if (mounted) {
-      _showSnack(
-        bothDone
-            ? '✅ Ride completed!'
-            : 'Marked as complete! Waiting for the other party…',
-        Colors.green,
-      );
+      _showSuccess(bothDone
+          ? '✅ Ride completed!'
+          : 'Marked as complete! Waiting for the other party…');
     }
   }
 
   Future<void> _showCancelDialog() async {
     final confirmed = await _confirmSheet(
       icon: Icons.warning_amber_rounded,
-      iconColor: Colors.redAccent,
-      bgColor: Colors.red,
+      iconColor: T.red,
       title: 'Cancel Ride?',
       subtitle: 'Both parties must confirm to fully cancel the ride.',
       confirmLabel: 'Yes, Cancel',
-      confirmColor: Colors.redAccent,
-      confirmTextColor: Colors.white,
+      confirmColor: T.red,
+      confirmTextColor: T.txtWhite,
     );
     if (confirmed != true || !mounted) return;
+
     await FirebaseFirestore.instance
         .collection('rides')
         .doc(widget.rideId)
         .update({
       widget.isDriver ? 'posterCancelled' : 'accepterCancelled': true,
     });
-    _showSnack('Cancellation requested.', Colors.red);
+    _showError('Cancellation requested.');
   }
 
   Future<bool?> _confirmSheet({
     required IconData icon,
     required Color iconColor,
-    required Color bgColor,
     required String title,
     required String subtitle,
     required String confirmLabel,
@@ -937,39 +1020,37 @@ class _RideActivePageState extends State<RideActivePage>
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         padding: EdgeInsets.fromLTRB(24, 24, 24, 16 + bottom),
         decoration: BoxDecoration(
-          color: const Color(0xFF1E3C72),
+          color: T.card,
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white.withOpacity(0.15), width: 1),
+          boxShadow: [BoxShadow(color: T.shadow, blurRadius: 20)],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 40,
-              height: 4,
+              width: 40, height: 4,
               margin: const EdgeInsets.only(bottom: 20),
               decoration: BoxDecoration(
-                  color: Colors.white24,
-                  borderRadius: BorderRadius.circular(2)),
+                  color: T.border, borderRadius: BorderRadius.circular(2)),
             ),
-            CircleAvatar(
-              radius: 28,
-              backgroundColor: bgColor.withOpacity(0.2),
-              child: Icon(icon, color: iconColor, size: 28),
+            Container(
+              width: 56, height: 56,
+              decoration: BoxDecoration(
+                color: iconColor.withOpacity(0.12),
+                shape: BoxShape.circle,
+                border: Border.all(color: iconColor.withOpacity(0.3), width: 1.5),
+              ),
+              child: Icon(icon, color: iconColor, size: 26),
             ),
             const SizedBox(height: 16),
             Text(title,
                 style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800)),
+                    color: T.txtDark, fontSize: 18, fontWeight: FontWeight.w800)),
             const SizedBox(height: 8),
             Text(subtitle,
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                    color: Colors.white.withOpacity(0.65),
-                    fontSize: 14,
-                    height: 1.5)),
+                style: const TextStyle(
+                    color: T.txtMed, fontSize: 14, height: 1.5)),
             const SizedBox(height: 24),
             Row(
               children: [
@@ -978,12 +1059,13 @@ class _RideActivePageState extends State<RideActivePage>
                     onPressed: () => Navigator.pop(context, false),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14),
-                      side: BorderSide(color: Colors.white.withOpacity(0.3)),
+                      side: const BorderSide(color: T.border, width: 1.5),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text('Cancel',
-                        style: TextStyle(color: Colors.white70)),
+                    child: const Text('Back',
+                        style: TextStyle(
+                            color: T.txtMed, fontWeight: FontWeight.w600)),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -999,8 +1081,7 @@ class _RideActivePageState extends State<RideActivePage>
                           borderRadius: BorderRadius.circular(12)),
                     ),
                     child: Text(confirmLabel,
-                        style:
-                        const TextStyle(fontWeight: FontWeight.w700)),
+                        style: const TextStyle(fontWeight: FontWeight.w800)),
                   ),
                 ),
               ],
@@ -1011,56 +1092,18 @@ class _RideActivePageState extends State<RideActivePage>
     );
   }
 
-  // ── Reusable widgets ───────────────────────────────────────────────────────
-  Widget _glassCard({required Widget child, Color? borderColor}) {
+  // ── Reusable Widgets ───────────────────────────────────────────────────────
+  Widget _surfaceCard({required Widget child}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: borderColor ?? Colors.white.withOpacity(0.2),
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.12),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: T.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: T.border),
+        boxShadow: [BoxShadow(color: T.shadow, blurRadius: 8, offset: const Offset(0, 2))],
       ),
       child: child,
-    );
-  }
-
-  Widget _glassButton({required Widget child, VoidCallback? onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(12),
-          border:
-          Border.all(color: Colors.white.withOpacity(0.2), width: 1),
-        ),
-        child: child,
-      ),
-    );
-  }
-
-  Widget _decorCircle(double size, double opacity) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: RadialGradient(
-          colors: [Colors.white.withOpacity(opacity), Colors.transparent],
-        ),
-      ),
     );
   }
 
@@ -1069,30 +1112,51 @@ class _RideActivePageState extends State<RideActivePage>
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         SizedBox(
-          width: 14,
-          height: 14,
+          width: 14, height: 14,
           child: CircularProgressIndicator(
-            strokeWidth: 2,
-            color: Colors.white.withOpacity(0.5),
-          ),
+              strokeWidth: 2, color: T.txtLight),
         ),
         const SizedBox(width: 10),
-        Text(text,
-            style: TextStyle(
-                color: Colors.white.withOpacity(0.5),
-                fontSize: 13)),
+        Text(text, style: const TextStyle(color: T.txtMed, fontSize: 13)),
       ],
     );
   }
 
-  void _showSnack(String msg, Color color) {
+  void _showSuccess(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg),
-      backgroundColor: color,
+      content: Row(children: [
+        const Icon(Icons.check_circle, color: T.txtDark, size: 18),
+        const SizedBox(width: 10),
+        Expanded(
+            child: Text(msg,
+                style: const TextStyle(
+                    color: T.txtDark, fontSize: 13, fontWeight: FontWeight.w700))),
+      ]),
+      backgroundColor: T.yellow,
       behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: const EdgeInsets.all(16),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      margin: const EdgeInsets.all(14),
+      duration: const Duration(seconds: 2),
+    ));
+  }
+
+  void _showError(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Row(children: [
+        const Icon(Icons.error_outline, color: T.txtWhite, size: 18),
+        const SizedBox(width: 10),
+        Expanded(
+            child: Text(msg,
+                style: const TextStyle(
+                    color: T.txtWhite, fontSize: 13, fontWeight: FontWeight.w600))),
+      ]),
+      backgroundColor: T.red,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      margin: const EdgeInsets.all(14),
+      duration: const Duration(seconds: 3),
     ));
   }
 }

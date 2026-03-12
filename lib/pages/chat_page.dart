@@ -17,48 +17,30 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  static const Color kNavy = Color(0xFF1A2340);
+  static const Color kYellow = Color(0xFFFFCC00);
+  static const Color kBackground = Color(0xFFEEF0F5);
+
   bool _isTyping = false;
   List<String> _typingUsers = [];
   Map<String, dynamic> _userCache = {};
   bool _isLoading = false;
-
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
 
   @override
   void initState() {
     super.initState();
     _listenTypingStatus();
     _loadUserData();
-
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
-    );
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.1),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOutCubic,
-    ));
-    _animationController.forward();
   }
 
   @override
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
-    _animationController.dispose();
     _updateTyping(false);
     super.dispose();
   }
 
-  // Load user data for display names and avatars
   Future<void> _loadUserData() async {
     try {
       final rideDoc = await _firestore.collection('rides').doc(widget.rideId).get();
@@ -77,7 +59,6 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     }
   }
 
-  // Listen to typing status of other users
   void _listenTypingStatus() {
     _firestore
         .collection('rides')
@@ -89,7 +70,6 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
           .where((doc) => doc.id != _auth.currentUser!.uid && doc['typing'] == true)
           .map((doc) => doc.id)
           .toList();
-
       setState(() {
         _typingUsers = typingUsersList;
         _isTyping = typingUsersList.isNotEmpty;
@@ -97,7 +77,6 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     });
   }
 
-  // Update typing status with debouncing
   void _updateTyping(bool typing) {
     _firestore
         .collection('rides')
@@ -110,7 +89,6 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     }, SetOptions(merge: true));
   }
 
-  // Send text message with validation
   Future<void> sendMessage() async {
     String message = _messageController.text.trim();
     if (message.isEmpty || _isLoading) return;
@@ -141,11 +119,8 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     }
   }
 
-  // Enhanced profanity filter
   String _filterProfanity(String text) {
-    final banned = [
-      'badword1', 'badword2', 'spam', 'offensive'
-    ];
+    final banned = ['badword1', 'badword2', 'spam', 'offensive'];
     String filtered = text;
     for (var word in banned) {
       filtered = filtered.replaceAll(
@@ -156,7 +131,6 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     return filtered;
   }
 
-  // Scroll to bottom of chat
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
       _scrollController.animateTo(
@@ -167,7 +141,6 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     }
   }
 
-  // Show error message with modern snackbar
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -175,12 +148,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
           children: [
             const Icon(Icons.error_outline, color: Colors.white),
             const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                message,
-                style: const TextStyle(fontSize: 15),
-              ),
-            ),
+            Expanded(child: Text(message, style: const TextStyle(fontSize: 15))),
           ],
         ),
         backgroundColor: const Color(0xFFE53935),
@@ -192,25 +160,18 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     );
   }
 
-  // Format timestamp
   String _formatTime(Timestamp? ts) {
     if (ts == null) return 'Sending...';
     final now = DateTime.now();
     final date = ts.toDate();
     final diff = now.difference(date);
 
-    if (diff.inDays == 0) {
-      return DateFormat('hh:mm a').format(date);
-    } else if (diff.inDays == 1) {
-      return 'Yesterday ${DateFormat('hh:mm a').format(date)}';
-    } else if (diff.inDays < 7) {
-      return DateFormat('EEE hh:mm a').format(date);
-    } else {
-      return DateFormat('MMM d, hh:mm a').format(date);
-    }
+    if (diff.inDays == 0) return DateFormat('hh:mm a').format(date);
+    if (diff.inDays == 1) return 'Yesterday ${DateFormat('hh:mm a').format(date)}';
+    if (diff.inDays < 7) return DateFormat('EEE hh:mm a').format(date);
+    return DateFormat('MMM d, hh:mm a').format(date);
   }
 
-  // Get user name from cache
   String _getUserName(String userId) {
     return _userCache[userId]?['name'] ?? 'User';
   }
@@ -225,21 +186,20 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     return GestureDetector(
       onLongPress: isMe ? () => _showMessageOptions(doc) : null,
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
+        margin: const EdgeInsets.symmetric(vertical: 3, horizontal: 16),
         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
         child: Column(
           crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
             if (!isMe)
               Padding(
-                padding: const EdgeInsets.only(left: 12, bottom: 4),
+                padding: const EdgeInsets.only(left: 4, bottom: 4),
                 child: Text(
                   senderName,
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.white.withOpacity(0.7),
+                    color: Colors.grey.shade500,
                     fontWeight: FontWeight.w600,
-                    letterSpacing: 0.3,
                   ),
                 ),
               ),
@@ -247,29 +207,18 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
               constraints: BoxConstraints(
                 maxWidth: MediaQuery.of(context).size.width * 0.75,
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                gradient: isMe
-                    ? const LinearGradient(
-                  colors: [Color(0xFF2196F3), Color(0xFF1976D2)],
-                )
-                    : null,
-                color: isMe ? null : Colors.white.withOpacity(0.15),
+                color: isMe ? kNavy : Colors.white,
                 borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(18),
-                  topRight: const Radius.circular(18),
-                  bottomLeft: Radius.circular(isMe ? 18 : 4),
-                  bottomRight: Radius.circular(isMe ? 4 : 18),
-                ),
-                border: Border.all(
-                  color: isMe
-                      ? Colors.white.withOpacity(0.3)
-                      : Colors.white.withOpacity(0.2),
-                  width: 1,
+                  topLeft: const Radius.circular(16),
+                  topRight: const Radius.circular(16),
+                  bottomLeft: Radius.circular(isMe ? 16 : 4),
+                  bottomRight: Radius.circular(isMe ? 4 : 16),
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withOpacity(0.06),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -281,12 +230,12 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                   Text(
                     _filterProfanity(msg['message']),
                     style: TextStyle(
-                      color: Colors.white,
+                      color: isMe ? Colors.white : kNavy,
                       fontSize: 15,
                       height: 1.4,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -294,27 +243,28 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                         time,
                         style: TextStyle(
                           fontSize: 11,
-                          color: Colors.white.withOpacity(0.7),
-                          fontWeight: FontWeight.w500,
+                          color: isMe
+                              ? Colors.white.withOpacity(0.6)
+                              : Colors.grey.shade400,
                         ),
                       ),
                       if (isMe) ...[
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 4),
                         Icon(
                           readCount > 1 ? Icons.done_all : Icons.done,
-                          size: 14,
-                          color: readCount > 1
-                              ? Colors.lightBlueAccent
-                              : Colors.white.withOpacity(0.7),
+                          size: 13,
+                          color: readCount > 1 ? kYellow : Colors.white.withOpacity(0.5),
                         ),
                       ],
                       if (msg['edited'] == true) ...[
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 4),
                         Text(
                           'edited',
                           style: TextStyle(
                             fontSize: 10,
-                            color: Colors.white.withOpacity(0.6),
+                            color: isMe
+                                ? Colors.white.withOpacity(0.5)
+                                : Colors.grey.shade400,
                             fontStyle: FontStyle.italic,
                           ),
                         ),
@@ -330,28 +280,16 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     );
   }
 
-  // Show message options (delete, edit) with modern design
   void _showMessageOptions(DocumentSnapshot doc) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF1E3C72),
-              Color(0xFF2A5298),
-            ],
-          ),
-          borderRadius: const BorderRadius.only(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
             topLeft: Radius.circular(24),
             topRight: Radius.circular(24),
-          ),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.2),
-            width: 1,
           ),
         ),
         child: SafeArea(
@@ -363,16 +301,16 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.3),
+                  color: Colors.grey.shade300,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               ListTile(
                 leading: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.2),
+                    color: const Color(0xFFFFEBEE),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(Icons.delete_outline, color: Colors.redAccent),
@@ -380,10 +318,7 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                 title: const Text(
                   'Delete Message',
                   style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
+                      color: kNavy, fontSize: 16, fontWeight: FontWeight.w500),
                 ),
                 onTap: () {
                   Navigator.pop(context);
@@ -398,7 +333,6 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     );
   }
 
-  // Delete message
   Future<void> _deleteMessage(DocumentSnapshot doc) async {
     try {
       await doc.reference.delete();
@@ -407,28 +341,16 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     }
   }
 
-  // Show chat options menu
   void _showChatOptions() {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF1E3C72),
-              Color(0xFF2A5298),
-            ],
-          ),
-          borderRadius: const BorderRadius.only(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
             topLeft: Radius.circular(24),
             topRight: Radius.circular(24),
-          ),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.2),
-            width: 1,
           ),
         ),
         child: SafeArea(
@@ -440,16 +362,16 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.3),
+                  color: Colors.grey.shade300,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               ListTile(
                 leading: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.2),
+                    color: const Color(0xFFFFEBEE),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(Icons.delete_sweep, color: Colors.redAccent),
@@ -457,17 +379,11 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                 title: const Text(
                   'Clear Chat',
                   style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
+                      color: kNavy, fontSize: 16, fontWeight: FontWeight.w500),
                 ),
                 subtitle: Text(
                   'Delete all messages',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.6),
-                    fontSize: 13,
-                  ),
+                  style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
                 ),
                 onTap: () {
                   Navigator.pop(context);
@@ -482,62 +398,39 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     );
   }
 
-  // Confirm clear chat dialog
   void _confirmClearChat() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1E3C72).withOpacity(0.95),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide(
-            color: Colors.white.withOpacity(0.2),
-            width: 1,
-          ),
-        ),
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.2),
+                color: const Color(0xFFFFEBEE),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(
-                Icons.warning_amber_rounded,
-                color: Colors.redAccent,
-                size: 24,
-              ),
+              child: const Icon(Icons.warning_amber_rounded,
+                  color: Colors.redAccent, size: 22),
             ),
             const SizedBox(width: 12),
             const Text(
               "Clear Chat?",
               style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 20,
-              ),
+                  color: kNavy, fontWeight: FontWeight.bold, fontSize: 18),
             ),
           ],
         ),
         content: Text(
-          "Are you sure you want to delete all messages? This action cannot be undone.",
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.8),
-            fontSize: 15,
-            height: 1.5,
-          ),
+          "Are you sure you want to delete all messages? This cannot be undone.",
+          style: TextStyle(color: Colors.grey.shade600, fontSize: 14, height: 1.5),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.white70,
-            ),
-            child: const Text(
-              "Cancel",
-              style: TextStyle(fontSize: 16),
-            ),
+            child: Text("Cancel", style: TextStyle(color: Colors.grey.shade500)),
           ),
           ElevatedButton(
             onPressed: () {
@@ -548,62 +441,41 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
               backgroundColor: Colors.redAccent,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  borderRadius: BorderRadius.circular(10)),
             ),
-            child: const Text(
-              "Clear",
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            child: const Text("Clear"),
           ),
         ],
       ),
     );
   }
 
-  // Clear all chat messages
   Future<void> _clearChat() async {
     setState(() => _isLoading = true);
-
     try {
       final chatCollection = _firestore
           .collection('rides')
           .doc(widget.rideId)
           .collection('chats');
-
       final snapshot = await chatCollection.get();
-
-      // Delete all messages in batch
       WriteBatch batch = _firestore.batch();
       for (var doc in snapshot.docs) {
         batch.delete(doc.reference);
       }
       await batch.commit();
-
-      // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Row(
+          content: const Row(
             children: [
-              const Icon(Icons.check_circle_outline, color: Colors.white),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Text(
-                  '✅ Chat cleared successfully',
-                  style: TextStyle(fontSize: 15),
-                ),
-              ),
+              Icon(Icons.check_circle_outline, color: Colors.white),
+              SizedBox(width: 12),
+              Text('Chat cleared successfully'),
             ],
           ),
           backgroundColor: const Color(0xFF43A047),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.all(16),
-          duration: const Duration(seconds: 3),
         ),
       );
     } catch (e) {
@@ -613,30 +485,31 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     }
   }
 
-  // Build typing indicator with modern design
   Widget _buildTypingIndicator() {
     if (!_isTyping) return const SizedBox.shrink();
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.2),
-                width: 1,
-              ),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Row(
               children: [
                 _buildTypingDot(0),
-                const SizedBox(width: 5),
+                const SizedBox(width: 4),
                 _buildTypingDot(1),
-                const SizedBox(width: 5),
+                const SizedBox(width: 4),
                 _buildTypingDot(2),
               ],
             ),
@@ -656,8 +529,8 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
           child: Container(
             width: 7,
             height: 7,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.8),
+            decoration: const BoxDecoration(
+              color: kNavy,
               shape: BoxShape.circle,
             ),
           ),
@@ -669,192 +542,104 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
+      backgroundColor: kBackground,
+      body: Column(
         children: [
-          // Gradient Background
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF1E3C72),
-                  Color(0xFF2A5298),
-                  Color(0xFF7E22CE),
-                ],
-              ),
-            ),
-          ),
-
-          // Animated Background Circles
-          Positioned(
-            top: -100,
-            right: -100,
-            child: Container(
-              width: 300,
-              height: 300,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    Colors.white.withOpacity(0.1),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -150,
-            left: -100,
-            child: Container(
-              width: 400,
-              height: 400,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    Colors.white.withOpacity(0.08),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // Main Content
-          SafeArea(
-            child: FadeTransition(
-              opacity: _fadeAnimation,
-              child: SlideTransition(
-                position: _slideAnimation,
-                child: Column(
-                  children: [
-                    // Custom App Bar
-                    _buildCustomAppBar(),
-
-                    // Messages Area
-                    Expanded(
-                      child: StreamBuilder<QuerySnapshot>(
-                        stream: _firestore
-                            .collection('rides')
-                            .doc(widget.rideId)
-                            .collection('chats')
-                            .orderBy('timestamp', descending: true)
-                            .limit(100)
-                            .snapshots(),
-                        builder: (context, snapshot) {
-                          if (snapshot.hasError) {
-                            return Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.error_outline,
-                                    size: 64,
-                                    color: Colors.white.withOpacity(0.5),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    'Error: ${snapshot.error}',
-                                    style: TextStyle(
-                                      color: Colors.white.withOpacity(0.8),
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }
-
-                          if (!snapshot.hasData) {
-                            return Center(
-                              child: CircularProgressIndicator(
-                                color: Colors.white.withOpacity(0.8),
-                              ),
-                            );
-                          }
-
-                          final messages = snapshot.data!.docs;
-
-                          if (messages.isEmpty) {
-                            return Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(24),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.15),
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: Colors.white.withOpacity(0.2),
-                                        width: 2,
-                                      ),
-                                    ),
-                                    child: Icon(
-                                      Icons.chat_bubble_outline,
-                                      size: 64,
-                                      color: Colors.white.withOpacity(0.7),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 24),
-                                  Text(
-                                    'No messages yet',
-                                    style: TextStyle(
-                                      color: Colors.white.withOpacity(0.9),
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w600,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Start the conversation!',
-                                    style: TextStyle(
-                                      color: Colors.white.withOpacity(0.7),
-                                      fontSize: 15,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }
-
-                          return ListView.builder(
-                            controller: _scrollController,
-                            reverse: true,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            itemCount: messages.length + 1,
-                            itemBuilder: (context, index) {
-                              if (index == 0) {
-                                return _buildTypingIndicator();
-                              }
-
-                              final msg = messages[index - 1];
-                              final msgData = msg.data()! as Map<String, dynamic>;
-
-                              // Mark as read
-                              if (!msgData['readBy'].contains(_auth.currentUser!.uid)) {
-                                msg.reference.update({
-                                  'readBy': FieldValue.arrayUnion([_auth.currentUser!.uid])
-                                });
-                              }
-
-                              return _buildMessageTile(msg);
-                            },
-                          );
-                        },
-                      ),
+          _buildCustomAppBar(),
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: _firestore
+                  .collection('rides')
+                  .doc(widget.rideId)
+                  .collection('chats')
+                  .orderBy('timestamp', descending: true)
+                  .limit(100)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.error_outline, size: 48, color: Colors.grey.shade400),
+                        const SizedBox(height: 12),
+                        Text('Something went wrong',
+                            style: TextStyle(color: Colors.grey.shade500)),
+                      ],
                     ),
+                  );
+                }
 
-                    // Message Input Area
-                    _buildMessageInput(),
-                  ],
-                ),
-              ),
+                if (!snapshot.hasData) {
+                  return const Center(
+                      child: CircularProgressIndicator(color: kNavy));
+                }
+
+                final messages = snapshot.data!.docs;
+
+                if (messages.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.06),
+                                blurRadius: 16,
+                              ),
+                            ],
+                          ),
+                          child: const Icon(Icons.chat_bubble_outline,
+                              size: 48, color: kNavy),
+                        ),
+                        const SizedBox(height: 20),
+                        const Text(
+                          'No messages yet',
+                          style: TextStyle(
+                              color: kNavy,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Start the conversation!',
+                          style: TextStyle(
+                              color: Colors.grey.shade500, fontSize: 14),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  controller: _scrollController,
+                  reverse: true,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  itemCount: messages.length + 1,
+                  itemBuilder: (context, index) {
+                    if (index == 0) return _buildTypingIndicator();
+
+                    final msg = messages[index - 1];
+                    final msgData = msg.data()! as Map<String, dynamic>;
+
+                    if (!(msgData['readBy'] as List).contains(_auth.currentUser!.uid)) {
+                      msg.reference.update({
+                        'readBy': FieldValue.arrayUnion([_auth.currentUser!.uid])
+                      });
+                    }
+
+                    return _buildMessageTile(msg);
+                  },
+                );
+              },
             ),
           ),
+          _buildMessageInput(),
         ],
       ),
     );
@@ -862,54 +647,41 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
 
   Widget _buildCustomAppBar() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
-        border: Border(
-          bottom: BorderSide(
-            color: Colors.white.withOpacity(0.2),
-            width: 1,
-          ),
-        ),
+      color: kNavy,
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 8,
+        left: 16,
+        right: 16,
+        bottom: 12,
       ),
       child: Row(
         children: [
-          // Back Button
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.2),
-                width: 1,
+          // Back button
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
               ),
-            ),
-            child: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () => Navigator.pop(context),
-            ),
-          ),
-          const SizedBox(width: 16),
-
-          // Chat Icon and Title
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.2),
-                width: 1,
-              ),
-            ),
-            child: const Icon(
-              Icons.chat_bubble,
-              color: Colors.white,
-              size: 24,
+              child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
             ),
           ),
           const SizedBox(width: 12),
 
+          // Avatar
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: kYellow,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.chat_bubble, color: kNavy, size: 18),
+          ),
+          const SizedBox(width: 10),
+
+          // Title
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -918,9 +690,8 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                   'Ride Chat',
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 18,
+                    fontSize: 17,
                     fontWeight: FontWeight.bold,
-                    letterSpacing: 0.5,
                   ),
                 ),
                 if (_isTyping)
@@ -929,28 +700,24 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                         ? 'Someone is typing...'
                         : '${_typingUsers.length} people typing...',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.7),
+                      color: kYellow.withOpacity(0.9),
                       fontSize: 12,
-                      fontWeight: FontWeight.w400,
                     ),
                   ),
               ],
             ),
           ),
 
-          // More Options
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.2),
-                width: 1,
+          // More options
+          GestureDetector(
+            onTap: _showChatOptions,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
               ),
-            ),
-            child: IconButton(
-              icon: const Icon(Icons.more_vert, color: Colors.white),
-              onPressed: _showChatOptions,
+              child: const Icon(Icons.more_vert, color: Colors.white, size: 20),
             ),
           ),
         ],
@@ -960,15 +727,16 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
 
   Widget _buildMessageInput() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
-        border: Border(
-          top: BorderSide(
-            color: Colors.white.withOpacity(0.2),
-            width: 1,
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 12,
+            offset: const Offset(0, -3),
           ),
-        ),
+        ],
       ),
       child: SafeArea(
         child: Row(
@@ -977,63 +745,45 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
+                  color: kBackground,
                   borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.2),
-                    width: 1,
-                  ),
+                  border: Border.all(color: Colors.grey.shade200),
                 ),
                 child: TextField(
                   controller: _messageController,
                   maxLines: null,
                   textCapitalization: TextCapitalization.sentences,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                  ),
+                  style: const TextStyle(color: kNavy, fontSize: 15),
                   decoration: InputDecoration(
                     hintText: 'Type a message...',
-                    hintStyle: TextStyle(
-                      color: Colors.white.withOpacity(0.5),
-                      fontSize: 15,
-                    ),
+                    hintStyle:
+                    TextStyle(color: Colors.grey.shade400, fontSize: 15),
                     border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                    contentPadding:
+                    const EdgeInsets.symmetric(vertical: 12),
                   ),
                   onChanged: (text) => _updateTyping(text.isNotEmpty),
                   onSubmitted: (_) => sendMessage(),
                 ),
               ),
             ),
-            const SizedBox(width: 12),
-            Container(
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF2196F3), Color(0xFF1976D2)],
+            const SizedBox(width: 10),
+            GestureDetector(
+              onTap: _isLoading ? null : sendMessage,
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: const BoxDecoration(
+                  color: kYellow,
+                  shape: BoxShape.circle,
                 ),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.blue.withOpacity(0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: IconButton(
-                icon: _isLoading
+                child: _isLoading
                     ? const SizedBox(
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 2,
-                  ),
+                      color: kNavy, strokeWidth: 2),
                 )
-                    : const Icon(Icons.send_rounded),
-                color: Colors.white,
-                onPressed: _isLoading ? null : sendMessage,
+                    : const Icon(Icons.send_rounded, color: kNavy, size: 20),
               ),
             ),
           ],
@@ -1042,4 +792,3 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     );
   }
 }
-
