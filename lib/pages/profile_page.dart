@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'login_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -152,6 +153,14 @@ class _ProfilePageState extends State<ProfilePage>
     setState(() => _signingOut = true);
     try {
       await _auth.signOut();
+      // ✅ ADD THIS — same as dashboard logout
+      if (mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const LoginPage()),
+              (route) => false,
+        );
+      }
     } catch (e) {
       if (mounted) {
         setState(() => _signingOut = false);

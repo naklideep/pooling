@@ -321,7 +321,7 @@ class _LoginPageState extends State<LoginPage>
       child: Row(children: [
         _liveChip(),
         const SizedBox(width: 10),
-        _infoChip(Icons.location_city_outlined, "UKA Tarsadia University"),
+        _infoChip(Icons.location_city_outlined, "Tarsadia University"),
       ]),
     );
   }
