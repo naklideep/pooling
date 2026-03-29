@@ -445,7 +445,21 @@ class _LoginPageState extends State<LoginPage>
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
-              onPressed: () {},
+              onPressed: () async {
+                final email = _emailCtrl.text.trim();
+
+                if (email.isEmpty) {
+                  _snack("Enter your email first", true);
+                  return;
+                }
+
+                try {
+                  await _auth.sendPasswordResetEmail(email: email);
+                  _snack("Password reset link sent to your email", false);
+                } catch (e) {
+                  _snack("Failed to send reset email", true);
+                }
+              },
               style: TextButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                 minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap,
