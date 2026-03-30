@@ -423,7 +423,7 @@ class _LoginPageState extends State<LoginPage>
           _inputField(
             ctrl: _emailCtrl,
             label: "Email Address",
-            hint: "sheth@example.com",
+            hint: "@example.com",
             icon: Icons.alternate_email_rounded,
             keyboardType: TextInputType.emailAddress,
           ),
@@ -457,6 +457,7 @@ class _LoginPageState extends State<LoginPage>
                   await _auth.sendPasswordResetEmail(email: email);
                   _snack("Password reset link sent to your email", false);
                 } catch (e) {
+                  //debugPrintStack();
                   _snack("Failed to send reset email", true);
                 }
               },
