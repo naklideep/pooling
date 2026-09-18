@@ -1,45 +1,52 @@
 {
   "project_info": {
-    "project_number": "684323409968",
-    "project_id": "riyal1-c9fe9",
-    "storage_bucket": "riyal1-c9fe9.firebasestorage.app"
+    "project_number": "648101956292",
+    "firebase_url": "https://newridebuddy-default-rtdb.firebaseio.com",
+    "project_id": "newridebuddy",
+    "storage_bucket": "newridebuddy.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:684323409968:android:3c4dcb587f97aae07fddf5",
-        "android_client_info": {
-          "package_name": "com.example.ghartak"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyAmlCde604Av5ysgRVdGpDyvhcqj-PP_kY"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:684323409968:android:5202c289f602ff5b7fddf5",
+        "mobilesdk_app_id": "1:648101956292:android:9926fa968f4f8f7a8b5791",
         "android_client_info": {
           "package_name": "com.example.riyal1"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "648101956292-4fimkb8qjbc6jre4i0drjbdej5i447m3.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.riyal1",
+            "certificate_hash": "49ae650446b4d45b3154cfec1cac83fb24843448"
+          }
+        },
+        {
+          "client_id": "648101956292-8d2tqipjm7ad2pnn76vh5kccu4rb9nbe.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyAmlCde604Av5ysgRVdGpDyvhcqj-PP_kY"
+          "current_key": "AIzaSyBOfDY0tO905jcnAc1i5lXrN0G8eBb_884"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "648101956292-8d2tqipjm7ad2pnn76vh5kccu4rb9nbe.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "648101956292-d9dfg1tv5l72u33abugj04onnqdmlmt2.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.riyal1"
+              }
+            }
+          ]
         }
       }
     }
