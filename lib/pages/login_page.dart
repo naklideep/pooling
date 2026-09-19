@@ -5,6 +5,7 @@ import 'dashboard_page.dart';
 import 'registration_page.dart';
 import 'admin_dashboard_page.dart';
 import 'onboarding_page.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 const String adminEmail = "chaudharideep1106@gmail.com";
 
@@ -117,6 +118,165 @@ class _LoginPageState extends State<LoginPage>
       setState(() => _loading = false);
     }
   }
+  //google sign in
+
+  Future<void> _loginWithGoogle() async {
+    setState(() => _loading = true);
+
+    try {
+      debugPrint("========== GOOGLE LOGIN START ==========");
+
+      final GoogleSignIn googleSignIn = GoogleSignIn.instance;
+
+      debugPrint("1. Initializing Google Sign-In...");
+      await googleSignIn.initialize();
+
+      debugPrint("2. Opening Google account picker...");
+      final GoogleSignInAccount googleUser =
+      await googleSignIn.authenticate();
+
+      debugPrint("3. Google account selected: ${googleUser.email}");
+
+      final GoogleSignInAuthentication googleAuth =
+          googleUser.authentication;
+
+      debugPrint("4. Got Google authentication");
+      debugPrint("ID TOKEN EXISTS: ${googleAuth.idToken != null}");
+
+      final credential = GoogleAuthProvider.credential(
+        idToken: googleAuth.idToken,
+      );
+
+      debugPrint("5. Signing into Firebase Auth...");
+
+      final userCredential =
+      await FirebaseAuth.instance.signInWithCredential(credential);
+
+      final user = userCredential.user!;
+
+      debugPrint("6. FIREBASE AUTH SUCCESS");
+      debugPrint("UID: ${user.uid}");
+      debugPrint("EMAIL: ${user.email}");
+
+      debugPrint("7. Reading Firestore users document...");
+
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      debugPrint("8. Firestore read SUCCESS");
+      debugPrint("Document exists: ${userDoc.exists}");
+
+      if (!userDoc.exists) {
+        debugPrint("9. Creating new user document...");
+
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .set({
+          'name': user.displayName ?? '',
+          'email': user.email ?? '',
+          'photoUrl': user.photoURL ?? '',
+          'role': 'user',
+          'isBanned': false,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+
+        debugPrint("10. User document CREATED");
+      }
+
+      final updatedDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      debugPrint("11. User document retrieved again");
+
+      final data = updatedDoc.data();
+
+      if (data?['isBanned'] == true) {
+        await FirebaseAuth.instance.signOut();
+        await googleSignIn.signOut();
+
+        _snack("Your account has been banned", true);
+        return;
+      }
+
+      final isAdmin =
+          user.email == adminEmail ||
+              data?['role'] == 'admin';
+
+      debugPrint("12. Admin: $isAdmin");
+      debugPrint("13. NAVIGATING...");
+
+      if (!mounted) return;
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => isAdmin
+              ? const AdminDashboardPage()
+              : DashboardPage(),
+        ),
+      );
+
+    } on FirebaseAuthException catch (e) {
+
+      debugPrint("🔥 FIREBASE AUTH ERROR");
+      debugPrint("CODE: ${e.code}");
+      debugPrint("MESSAGE: ${e.message}");
+
+      _snack(
+        "Firebase Auth: ${e.code}",
+        true,
+      );
+
+    } on FirebaseException catch (e) {
+
+      debugPrint("🔥 FIREBASE SERVICE ERROR");
+      debugPrint("PLUGIN: ${e.plugin}");
+      debugPrint("CODE: ${e.code}");
+      debugPrint("MESSAGE: ${e.message}");
+
+      _snack(
+        "${e.plugin}: ${e.code}",
+        true,
+      );
+
+    } on GoogleSignInException catch (e) {
+
+      debugPrint("🔥 GOOGLE SIGN-IN ERROR");
+      debugPrint("CODE: ${e.code}");
+      debugPrint("DESCRIPTION: ${e.description}");
+
+      _snack(
+        "Google: ${e.code}",
+        true,
+      );
+
+    } catch (e, stackTrace) {
+
+      debugPrint("🔥 UNKNOWN ERROR");
+      debugPrint("$e");
+      debugPrint("$stackTrace");
+
+      _snack(
+        "Error: $e",
+        true,
+      );
+
+    } finally {
+
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+
+      debugPrint("========== GOOGLE LOGIN END ==========");
+    }
+  }
+
+
 
   void _snack(String msg, bool isError) {
     if (!mounted) return;
@@ -249,7 +409,7 @@ class _LoginPageState extends State<LoginPage>
               child: const Row(mainAxisSize: MainAxisSize.min, children: [
                 Icon(Icons.bolt_rounded, color: navy, size: 12),
                 SizedBox(width: 4),
-                Text("CAMPUS RIDES", style: TextStyle(
+                Text("SHARE RIDES", style: TextStyle(
                     color: navy, fontSize: 9,
                     fontWeight: FontWeight.w900, letterSpacing: 1.4)),
               ]),
@@ -321,7 +481,7 @@ class _LoginPageState extends State<LoginPage>
       child: Row(children: [
         _liveChip(),
         const SizedBox(width: 10),
-        _infoChip(Icons.location_city_outlined, "Tarsadia University"),
+        _infoChip(Icons.location_on_outlined, "Local Rides"),
       ]),
     );
   }
@@ -350,7 +510,7 @@ class _LoginPageState extends State<LoginPage>
           ),
         ),
         const SizedBox(width: 8),
-        Text("Live Rides Active",
+        Text("Live Rides",
             style: TextStyle(color: white.withOpacity(0.65),
                 fontSize: 11, fontWeight: FontWeight.w600)),
       ]),
@@ -512,6 +672,43 @@ class _LoginPageState extends State<LoginPage>
                   ],
                 ]),
               ]),
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          // GOOGLE LOGIN BUTTON
+          GestureDetector(
+            onTap: _loading ? null : _loginWithGoogle,
+            child: Container(
+              height: 52,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: greyBdr,
+                  width: 1.5,
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Image.asset(
+                    'assets/google_logo.png',
+                    width: 20,
+                    height: 20,
+                  ),
+                  const SizedBox(width: 10),
+                  const Text(
+                    "Continue with Google",
+                    style: TextStyle(
+                      color: navy,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
 

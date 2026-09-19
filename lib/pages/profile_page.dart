@@ -17,7 +17,30 @@ class _ProfilePageState extends State<ProfilePage>
   Map<String, dynamic>? userData;
   bool isLoading = true;
   bool _signingOut = false;
+  Widget _buildAvatar() {
+    final photoUrl = userData?['photoUrl'] as String?;
 
+    final hasPhoto =
+        photoUrl != null && photoUrl.trim().isNotEmpty;
+
+    return CircleAvatar(
+      radius: 46,
+      backgroundColor: yellow,
+      backgroundImage:
+      hasPhoto ? NetworkImage(photoUrl!) : null,
+      child: hasPhoto
+          ? null
+          : Text(
+        _getInitials(userData?['name']),
+        style: const TextStyle(
+          fontSize: 28,
+          fontWeight: FontWeight.w900,
+          color: navy,
+          letterSpacing: -1,
+        ),
+      ),
+    );
+  }
   // UPI editing state
   bool _editingUpi = false;
   bool _savingUpi = false;
@@ -312,30 +335,7 @@ class _ProfilePageState extends State<ProfilePage>
                           ],
                         ),
                       ),
-                      CircleAvatar(
-                        radius: 46,
-                        backgroundColor: yellow,
-                        child: Stack(children: [
-                          Positioned.fill(child: Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [white.withOpacity(0.25), Colors.transparent],
-                              ),
-                            ),
-                          )),
-                          Center(
-                            child: Text(
-                              _getInitials(userData?['name']),
-                              style: const TextStyle(
-                                  fontSize: 28, fontWeight: FontWeight.w900,
-                                  color: navy, letterSpacing: -1),
-                            ),
-                          ),
-                        ]),
-                      ),
+                      _buildAvatar(),
                       Positioned(
                         bottom: 4, right: 4,
                         child: Container(
@@ -364,50 +364,8 @@ class _ProfilePageState extends State<ProfilePage>
 
                   const SizedBox(height: 10),
 
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
-                    decoration: BoxDecoration(
-                      color: yellow.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: yellow.withOpacity(0.35)),
-                    ),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      const Icon(Icons.badge_outlined, color: yellow, size: 13),
-                      const SizedBox(width: 6),
-                      Text(
-                        userData?['enrollment'] ?? '—',
-                        style: const TextStyle(
-                            color: yellow, fontSize: 12,
-                            fontWeight: FontWeight.w700, letterSpacing: 1.4),
-                      ),
-                    ]),
-                  ),
 
                   const SizedBox(height: 12),
-
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: white.withOpacity(0.07),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: white.withOpacity(0.1)),
-                    ),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(Icons.school_rounded,
-                          color: white.withOpacity(0.5), size: 13),
-                      const SizedBox(width: 7),
-                      Flexible(
-                        child: Text(
-                          userData?['college'] ?? 'Tarsadia University',
-                          style: TextStyle(
-                              color: white.withOpacity(0.55),
-                              fontSize: 11, fontWeight: FontWeight.w500),
-                          textAlign: TextAlign.center,
-                          maxLines: 2, overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ]),
-                  ),
                 ],
               ),
             ),
@@ -449,12 +407,7 @@ class _ProfilePageState extends State<ProfilePage>
                     value: userData?['email'] ?? '—',
                     accent: const Color(0xFF10B981),
                   ),
-                  _infoCard(
-                    icon: Icons.badge_outlined,
-                    label: 'Enrollment No.',
-                    value: userData?['enrollment'] ?? '—',
-                    accent: const Color(0xFF0EA5E9),
-                  ),
+
                   _infoCard(
                     icon: Icons.calendar_today_outlined,
                     label: 'Member Since',
@@ -707,20 +660,36 @@ class _ProfilePageState extends State<ProfilePage>
             color: navy.withOpacity(0.08),
             borderRadius: BorderRadius.circular(13),
           ),
-          child: const Icon(Icons.school_rounded, color: navy, size: 22),
+          child: const Icon(
+            Icons.people_alt_rounded,
+            color: navy,
+            size: 22,
+          ),
         ),
         const SizedBox(width: 14),
+
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Student Account',
-                  style: TextStyle(
-                      fontSize: 14, color: txtDark, fontWeight: FontWeight.w800)),
+              const Text(
+                'User Account',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: txtDark,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+
               const SizedBox(height: 3),
-              Text(userData?['college'] ?? 'Tarsadia University',
-                  style: const TextStyle(fontSize: 11, color: txtMed),
-                  maxLines: 1, overflow: TextOverflow.ellipsis),
+
+              const Text(
+                'RideBuddy Community Member',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: txtMed,
+                ),
+              ),
             ],
           ),
         ),

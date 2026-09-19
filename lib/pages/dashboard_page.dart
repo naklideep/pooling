@@ -16,6 +16,11 @@ class DashboardPage extends StatefulWidget {
   _DashboardPageState createState() => _DashboardPageState();
 }
 
+//Proflie icon
+String userName = "User";
+String? userPhotoUrl;
+int selectedIndex = 0;
+DateTime? _lastBackPressed;
 class _DashboardPageState extends State<DashboardPage>
     with SingleTickerProviderStateMixin {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -45,9 +50,18 @@ class _DashboardPageState extends State<DashboardPage>
           .collection("users")
           .doc(user.uid)
           .get();
-      if (doc.exists) {
+      if (doc.exists && mounted) {
+        final data = doc.data();
+
         setState(() {
-          userName = doc["name"] ?? "User";
+          userName = data?["name"] ?? user.displayName ?? "User";
+
+          userPhotoUrl = data?["photoUrl"];
+
+          // Fallback to Firebase Auth photo
+          if (userPhotoUrl == null || userPhotoUrl!.trim().isEmpty) {
+            userPhotoUrl = user.photoURL;
+          }
         });
       }
     }
@@ -318,12 +332,38 @@ class _DashboardPageState extends State<DashboardPage>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(14),
+                    width: 64,
+                    height: 64,
                     decoration: BoxDecoration(
-                      color: kYellow,
                       shape: BoxShape.circle,
+                      color: kYellow,
+                      border: Border.all(
+                        color: kYellow,
+                        width: 2,
+                      ),
                     ),
-                    child: const Icon(Icons.person, size: 36, color: kNavy),
+                    child: ClipOval(
+                      child: userPhotoUrl != null &&
+                          userPhotoUrl!.trim().isNotEmpty
+                          ? Image.network(
+                        userPhotoUrl!,
+                        width: 64,
+                        height: 64,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) {
+                          return const Icon(
+                            Icons.person,
+                            size: 36,
+                            color: kNavy,
+                          );
+                        },
+                      )
+                          : const Icon(
+                        Icons.person,
+                        size: 36,
+                        color: kNavy,
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   Text(
@@ -426,7 +466,7 @@ class _DashboardPageState extends State<DashboardPage>
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    "GharTak v1.0",
+                    "RideBuddy v1.0",
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.4),
                       fontSize: 12,

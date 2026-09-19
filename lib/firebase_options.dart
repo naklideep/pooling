@@ -41,48 +41,53 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyBaxDzm6YWF5_nOjW88sH0UAfImEfJbpgM',
-    appId: '1:684323409968:web:68c531545c9d53837fddf5',
-    messagingSenderId: '684323409968',
-    projectId: 'riyal1-c9fe9',
-    authDomain: 'riyal1-c9fe9.firebaseapp.com',
-    storageBucket: 'riyal1-c9fe9.firebasestorage.app',
-    measurementId: 'G-8HZVFQZ0PK',
+    apiKey: 'AIzaSyBbch5Wcscm6NvJ1fGcYE8YK7_SZGwv1Xo',
+    appId: '1:648101956292:web:cdf9b2b6b817c77d8b5791',
+    messagingSenderId: '648101956292',
+    projectId: 'newridebuddy',
+    authDomain: 'newridebuddy.firebaseapp.com',
+    databaseURL: 'https://newridebuddy-default-rtdb.firebaseio.com',
+    storageBucket: 'newridebuddy.firebasestorage.app',
+    measurementId: 'G-0BDEK25LN1',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyAmlCde604Av5ysgRVdGpDyvhcqj-PP_kY',
-    appId: '1:684323409968:android:5202c289f602ff5b7fddf5',
-    messagingSenderId: '684323409968',
-    projectId: 'riyal1-c9fe9',
-    storageBucket: 'riyal1-c9fe9.firebasestorage.app',
+    apiKey: 'AIzaSyBOfDY0tO905jcnAc1i5lXrN0G8eBb_884',
+    appId: '1:648101956292:android:9926fa968f4f8f7a8b5791',
+    messagingSenderId: '648101956292',
+    projectId: 'newridebuddy',
+    databaseURL: 'https://newridebuddy-default-rtdb.firebaseio.com',
+    storageBucket: 'newridebuddy.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyD9g7e6O6JSS7_4mSJmfExupetqR3q1-fQ',
-    appId: '1:684323409968:ios:6f324d1cf915948c7fddf5',
-    messagingSenderId: '684323409968',
-    projectId: 'riyal1-c9fe9',
-    storageBucket: 'riyal1-c9fe9.firebasestorage.app',
+    apiKey: 'AIzaSyBuSpSUHK7TL56CmuxnpayQ4Mg7WN8rwys',
+    appId: '1:648101956292:ios:73dcbc1fc0215d668b5791',
+    messagingSenderId: '648101956292',
+    projectId: 'newridebuddy',
+    databaseURL: 'https://newridebuddy-default-rtdb.firebaseio.com',
+    storageBucket: 'newridebuddy.firebasestorage.app',
+    iosClientId: '648101956292-d9dfg1tv5l72u33abugj04onnqdmlmt2.apps.googleusercontent.com',
     iosBundleId: 'com.example.riyal1',
   );
-
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyD9g7e6O6JSS7_4mSJmfExupetqR3q1-fQ',
-    appId: '1:684323409968:ios:6f324d1cf915948c7fddf5',
-    messagingSenderId: '684323409968',
-    projectId: 'riyal1-c9fe9',
-    storageBucket: 'riyal1-c9fe9.firebasestorage.app',
+    apiKey: 'AIzaSyBuSpSUHK7TL56CmuxnpayQ4Mg7WN8rwys',
+    appId: '1:648101956292:ios:73dcbc1fc0215d668b5791',
+    messagingSenderId: '648101956292',
+    projectId: 'newridebuddy',
+    databaseURL: 'https://newridebuddy-default-rtdb.firebaseio.com',
+    storageBucket: 'newridebuddy.firebasestorage.app',
+    iosClientId: '648101956292-d9dfg1tv5l72u33abugj04onnqdmlmt2.apps.googleusercontent.com',
     iosBundleId: 'com.example.riyal1',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyBaxDzm6YWF5_nOjW88sH0UAfImEfJbpgM',
-    appId: '1:684323409968:web:115b6a5e81edc9597fddf5',
-    messagingSenderId: '684323409968',
-    projectId: 'riyal1-c9fe9',
-    authDomain: 'riyal1-c9fe9.firebaseapp.com',
-    storageBucket: 'riyal1-c9fe9.firebasestorage.app',
-    measurementId: 'G-M0ZLTH7D5G',
+    apiKey: 'AIzaSyBbch5Wcscm6NvJ1fGcYE8YK7_SZGwv1Xo',
+    appId: '1:648101956292:web:76d3e6726b1c704d8b5791',
+    messagingSenderId: '648101956292',
+    projectId: 'newridebuddy',
+    authDomain: 'newridebuddy.firebaseapp.com',
+    databaseURL: 'https://newridebuddy-default-rtdb.firebaseio.com',
+    storageBucket: 'newridebuddy.firebasestorage.app',
+    measurementId: 'G-S4RH9NK7LN',
   );
 }
