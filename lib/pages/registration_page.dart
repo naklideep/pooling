@@ -16,6 +16,7 @@ class _RegistrationPageState extends State<RegistrationPage>
   final _dobCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmPasswordCtrl = TextEditingController();
+  String? _selectedGender;
 
   final _auth = FirebaseAuth.instance;
   final _firestore = FirebaseFirestore.instance;
