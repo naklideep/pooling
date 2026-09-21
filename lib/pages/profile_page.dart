@@ -213,7 +213,27 @@ class _ProfilePageState extends State<ProfilePage>
     if (parts.length == 1) return parts[0][0].toUpperCase();
     return (parts[0][0] + parts.last[0]).toUpperCase();
   }
+  String _formatDob(dynamic dob) {
+    if (dob == null) return '—';
 
+    try {
+      DateTime date;
+
+      if (dob is Timestamp) {
+        date = dob.toDate();
+      } else if (dob is DateTime) {
+        date = dob;
+      } else {
+        return '—';
+      }
+
+      return '${date.day.toString().padLeft(2, '0')}/'
+          '${date.month.toString().padLeft(2, '0')}/'
+          '${date.year}';
+    } catch (_) {
+      return '—';
+    }
+  }
   // ── BUILD ────────────────────────────────────
   @override
   Widget build(BuildContext context) {
@@ -406,6 +426,18 @@ class _ProfilePageState extends State<ProfilePage>
                     label: 'Email Address',
                     value: userData?['email'] ?? '—',
                     accent: const Color(0xFF10B981),
+                  ),
+                  _infoCard(
+                    icon: Icons.cake_outlined,
+                    label: 'Date of Birth',
+                    value: _formatDob(userData?['dob']),
+                    accent: const Color(0xFF8B5CF6),
+                  ),
+                  _infoCard(
+                    icon: Icons.wc_rounded,
+                    label: 'Gender',
+                    value: userData?['gender']?.toString() ?? '—',
+                    accent: const Color(0xFFEC4899),
                   ),
 
                   _infoCard(
