@@ -409,6 +409,13 @@ class _ProfilePageState extends State<ProfilePage>
                   ),
 
                   _infoCard(
+                    icon: Icons.person_outline_rounded,
+                    label: 'Gender',
+                    value: userData?['gender'] ?? '—',
+                    accent: const Color(0xFF6366F1),
+                  ),
+
+                  _infoCard(
                     icon: Icons.calendar_today_outlined,
                     label: 'Member Since',
                     value: userData?['createdAt'] != null
@@ -684,7 +691,7 @@ class _ProfilePageState extends State<ProfilePage>
               const SizedBox(height: 3),
 
               const Text(
-                'RideBuddy Community Member',
+                'Ghartak Community Member',
                 style: TextStyle(
                   fontSize: 11,
                   color: txtMed,

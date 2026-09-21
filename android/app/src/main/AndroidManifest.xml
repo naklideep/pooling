@@ -16,7 +16,7 @@
         android:maxSdkVersion="28" />
 
     <application
-        android:label="NewRideBuddy"
+        android:label="NewGharTak"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">

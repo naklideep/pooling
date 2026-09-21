@@ -15,6 +15,7 @@ class _RegistrationPageState extends State<RegistrationPage>
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmPasswordCtrl = TextEditingController();
+  String? _selectedGender;
 
   final _auth = FirebaseAuth.instance;
   final _firestore = FirebaseFirestore.instance;
@@ -100,8 +101,127 @@ class _RegistrationPageState extends State<RegistrationPage>
     final confirmPassword = _confirmPasswordCtrl.text.trim();
 
     // Validation
+    // ============================================================
+// VALIDATION
+// ============================================================
+
+// Name validation
     if (name.isEmpty) {
       _snack("Please enter your full name", isError: true);
+      return;
+    }
+
+    if (name.length < 2) {
+      _snack("Name must contain at least 2 characters", isError: true);
+      return;
+    }
+
+    if (name.length > 50) {
+      _snack("Name must not exceed 50 characters", isError: true);
+      return;
+    }
+
+// Only letters and spaces
+    final nameRegex = RegExp(r"^[A-Za-z]+(?:[ .'-][A-Za-z]+)*$");
+
+    if (!nameRegex.hasMatch(name)) {
+      _snack(
+        "Name can contain only letters, spaces, dots or apostrophes",
+        isError: true,
+      );
+      return;
+    }
+
+// Email validation
+    if (email.isEmpty) {
+      _snack("Please enter your email", isError: true);
+      return;
+    }
+
+    final emailRegex = RegExp(
+      r'^[\w.+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$',
+    );
+
+    if (!emailRegex.hasMatch(email)) {
+      _snack("Please enter a valid email address", isError: true);
+      return;
+    }
+
+// Gender validation
+    if (_selectedGender == null) {
+      _snack("Please select your gender", isError: true);
+      return;
+    }
+
+// Password validation
+    if (password.isEmpty) {
+      _snack("Please enter a password", isError: true);
+      return;
+    }
+
+    if (password.length < 8) {
+      _snack(
+        "Password must contain at least 8 characters",
+        isError: true,
+      );
+      return;
+    }
+
+    if (password.length > 64) {
+      _snack(
+        "Password must not exceed 64 characters",
+        isError: true,
+      );
+      return;
+    }
+
+// Password strength
+    if (!RegExp(r'[A-Z]').hasMatch(password)) {
+      _snack(
+        "Password must contain at least one uppercase letter",
+        isError: true,
+      );
+      return;
+    }
+
+    if (!RegExp(r'[a-z]').hasMatch(password)) {
+      _snack(
+        "Password must contain at least one lowercase letter",
+        isError: true,
+      );
+      return;
+    }
+
+    if (!RegExp(r'[0-9]').hasMatch(password)) {
+      _snack(
+        "Password must contain at least one number",
+        isError: true,
+      );
+      return;
+    }
+
+    if (!RegExp(r'[!@#$%^&*(),.?":{}|<>_\-\\/\[\]+=`~;]').hasMatch(password)) {
+      _snack(
+        "Password must contain at least one special character",
+        isError: true,
+      );
+      return;
+    }
+
+// Confirm password
+    if (confirmPassword.isEmpty) {
+      _snack(
+        "Please confirm your password",
+        isError: true,
+      );
+      return;
+    }
+
+    if (password != confirmPassword) {
+      _snack(
+        "Passwords do not match",
+        isError: true,
+      );
       return;
     }
 
@@ -625,6 +745,10 @@ class _RegistrationPageState extends State<RegistrationPage>
 
         const SizedBox(height: 16),
 
+        _buildGenderField(),
+
+        const SizedBox(height: 16),
+
         _inputField(
           controller: _passwordCtrl,
           label: "Password",
@@ -662,6 +786,88 @@ class _RegistrationPageState extends State<RegistrationPage>
         _infoStrip(
           Icons.verified_user_outlined,
           "We'll send a verification link to your email.",
+        ),
+      ],
+    );
+  }
+  Widget _buildGenderField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Gender",
+          style: TextStyle(
+            color: txtDark,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+
+        const SizedBox(height: 6),
+
+        Container(
+          decoration: BoxDecoration(
+            color: grey,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: greyBdr,
+            ),
+          ),
+          child: DropdownButtonFormField<String>(
+            value: _selectedGender,
+            isExpanded: true,
+
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 5,
+              ),
+              prefixIcon: Icon(
+                Icons.person_outline_rounded,
+                color: yellow,
+                size: 20,
+              ),
+            ),
+
+            hint: const Text(
+              "Select your gender",
+              style: TextStyle(
+                color: txtHint,
+                fontSize: 13,
+              ),
+            ),
+
+            icon: const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: txtMed,
+            ),
+
+            dropdownColor: white,
+
+            items: const [
+              DropdownMenuItem(
+                value: "Male",
+                child: Text("Male"),
+              ),
+              DropdownMenuItem(
+                value: "Female",
+                child: Text("Female"),
+              )
+            ],
+
+            onChanged: (value) {
+              setState(() {
+                _selectedGender = value;
+              });
+            },
+
+            style: const TextStyle(
+              color: txtDark,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         ),
       ],
     );

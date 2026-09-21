@@ -466,7 +466,7 @@ class _DashboardPageState extends State<DashboardPage>
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    "RideBuddy v1.0",
+                    "Ghartak v1.0",
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.4),
                       fontSize: 12,
