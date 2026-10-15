@@ -22,7 +22,6 @@ class _RegistrationPageState extends State<RegistrationPage>
   final _firestore = FirebaseFirestore.instance;
 
   DateTime? _selectedDob;
-  String? _selectedGender;
 
   bool _loading = false;
   bool _passwordObscure = true;
