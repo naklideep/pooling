@@ -5,6 +5,9 @@ import 'package:intl/intl.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/pooling_header.dart';
 import '../../core/widgets/loading_states.dart';
+import '../../pages/chat_page.dart';
+import '../../pages/ride_active_page.dart';
+import 'driver_requests_modal.dart';
 
 /// My Trips tab — shows a user's ride history segmented by status.
 ///
@@ -357,6 +360,187 @@ class _TripCard extends StatelessWidget {
               ],
             ],
           ),
+          if (status != 'cancelled' && status != 'completed') ...[
+            const SizedBox(height: 12),
+            const Divider(height: 1),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (isDriver &&
+                    (status == 'pending' ||
+                        status == 'published' ||
+                        status == 'full')) ...[
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      side: const BorderSide(color: AppColors.navy),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    onPressed: () => DriverRequestsModal.show(
+                      context,
+                      rideId: rideId,
+                      driverId: userId,
+                    ),
+                    icon: const Icon(
+                      Icons.people_outline_rounded,
+                      size: 14,
+                      color: AppColors.navy,
+                    ),
+                    label: const Text(
+                      'Requests',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.navy,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.yellow,
+                      foregroundColor: AppColors.navy,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    onPressed: () async {
+                      await FirebaseFirestore.instance
+                          .collection('rides')
+                          .doc(rideId)
+                          .update({'status': 'in_progress'});
+                      if (context.mounted) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => RideActivePage(
+                              rideId: rideId,
+                              userId: userId,
+                              isDriver: true,
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.play_arrow_rounded, size: 14),
+                    label: const Text(
+                      'Start Trip',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ] else if (status == 'in_progress') ...[
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      side: const BorderSide(color: AppColors.navy),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ChatPage(rideId: rideId),
+                      ),
+                    ),
+                    icon: const Icon(
+                      Icons.chat_bubble_outline_rounded,
+                      size: 14,
+                      color: AppColors.navy,
+                    ),
+                    label: const Text(
+                      'Chat',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.navy,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.success,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => RideActivePage(
+                          rideId: rideId,
+                          userId: userId,
+                          isDriver: isDriver,
+                        ),
+                      ),
+                    ),
+                    icon: const Icon(Icons.navigation_rounded, size: 14),
+                    label: const Text(
+                      'Live Trip',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      side: const BorderSide(color: AppColors.navy),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ChatPage(rideId: rideId),
+                      ),
+                    ),
+                    icon: const Icon(
+                      Icons.chat_bubble_outline_rounded,
+                      size: 14,
+                      color: AppColors.navy,
+                    ),
+                    label: const Text(
+                      'Chat',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.navy,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
         ],
       ),
     );

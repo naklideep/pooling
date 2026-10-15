@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../core/theme/app_colors.dart';
+import '../../data/repositories/booking_repository.dart';
 
 /// Compact/full ride list card used in Home and Find Ride tabs.
 ///
@@ -463,17 +465,12 @@ class _RideDetailSheet extends StatelessWidget {
                   // Book button
                   if (!isOwn && remaining > 0)
                     FilledButton.icon(
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        // Booking flow handled in Phase 3
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Booking flow coming in Phase 3 — stay tuned!',
-                            ),
-                          ),
-                        );
-                      },
+                      onPressed: () => _openBookingRequestDialog(
+                        context,
+                        ctx,
+                        remaining,
+                        cost,
+                      ),
                       icon: const Icon(Icons.check_circle_outline),
                       label: const Text('Request this Ride'),
                       style: FilledButton.styleFrom(
@@ -528,6 +525,183 @@ class _RideDetailSheet extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _openBookingRequestDialog(
+    BuildContext rootContext,
+    BuildContext sheetContext,
+    int remaining,
+    dynamic cost,
+  ) {
+    int selectedSeats = 1;
+    final num perSeat = cost is num ? cost : 0;
+
+    showDialog<void>(
+      context: rootContext,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final totalCost = selectedSeats * perSeat;
+
+          return AlertDialog(
+            backgroundColor: AppColors.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: const Row(
+              children: [
+                Icon(Icons.event_seat_rounded, color: AppColors.navy),
+                SizedBox(width: 10),
+                Text(
+                  'Select Seats',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'How many seats would you like to request for this trip?',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton.filledTonal(
+                      onPressed: selectedSeats > 1
+                          ? () => setDialogState(() => selectedSeats--)
+                          : null,
+                      icon: const Icon(Icons.remove_rounded),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Text(
+                        '$selectedSeats',
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.navy,
+                        ),
+                      ),
+                    ),
+                    IconButton.filledTonal(
+                      onPressed: selectedSeats < remaining
+                          ? () => setDialogState(() => selectedSeats++)
+                          : null,
+                      icon: const Icon(Icons.add_rounded),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Max $remaining seat${remaining == 1 ? '' : 's'} available',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                if (perSeat > 0) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.background,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Estimated Contribution',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        Text(
+                          '₹$totalCost',
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.navy,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogCtx),
+                child: const Text(
+                  'Cancel',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.yellow,
+                  foregroundColor: AppColors.navy,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                onPressed: () async {
+                  Navigator.pop(dialogCtx);
+                  Navigator.pop(sheetContext);
+
+                  final user = FirebaseAuth.instance.currentUser;
+                  final repo = BookingRepository();
+                  final res = await repo.requestSeat(
+                    rideId: rideId,
+                    passengerId: currentUserId,
+                    passengerName:
+                        user?.displayName ??
+                        user?.email?.split('@').first ??
+                        'Passenger',
+                    passengerPhoto: user?.photoURL,
+                    requestedSeats: selectedSeats,
+                  );
+
+                  if (rootContext.mounted) {
+                    ScaffoldMessenger.of(rootContext).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          res.message ??
+                              (res.success
+                                  ? 'Request sent!'
+                                  : 'Request failed'),
+                        ),
+                        backgroundColor: res.success
+                            ? AppColors.navy
+                            : AppColors.error,
+                      ),
+                    );
+                  }
+                },
+                child: const Text(
+                  'Send Request',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
