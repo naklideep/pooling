@@ -5,9 +5,7 @@ import 'pages/login_page.dart';
 import 'features/main_shell.dart';
 import 'pages/admin_dashboard_page.dart';
 import 'pages/onboarding_page.dart';
-
-// NOTE: Admin is currently routed by hardcoded email — see audit for Custom Claims upgrade plan.
-const String adminEmail = "chaudharideep1106@gmail.com";
+import 'core/utils/role_utils.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -159,9 +157,7 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
         return;
       }
 
-      final isAdmin = user.email == adminEmail ||
-          (doc.exists && doc.data()?['role'] == 'admin');
-
+      final isAdmin = await RoleUtils.isAdmin(user, doc.data());
       _goTo(isAdmin ? const AdminDashboardPage() : const MainShell());
 
     } catch (_) {

@@ -1,6 +1,5 @@
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/ride_model.dart';
 import '../models/ride_request_model.dart';
 
 /// Result wrapper for booking operations.

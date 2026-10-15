@@ -6,8 +6,7 @@ import 'registration_page.dart';
 import 'admin_dashboard_page.dart';
 import 'complete_registration_page.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-
-const String adminEmail = "chaudharideep1106@gmail.com";
+import '../core/utils/role_utils.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -33,7 +32,6 @@ class _LoginPageState extends State<LoginPage>
   // ============================================================
 
   static const navy = Color(0xFF0D1B3E);
-  static const navyMid = Color(0xFF1A2F5E);
   static const yellow = Color(0xFFFFCC00);
   static const white = Color(0xFFFFFFFF);
   static const grey = Color(0xFFF0F2F8);
@@ -461,10 +459,7 @@ class _LoginPageState extends State<LoginPage>
       // ADMIN CHECK
       // ========================================================
 
-      final isAdmin =
-          user.email?.toLowerCase() ==
-              adminEmail.toLowerCase() ||
-              data["role"] == "admin";
+      final isAdmin = await RoleUtils.isAdmin(user, data);
 
       debugPrint(
         "Is Admin: $isAdmin",

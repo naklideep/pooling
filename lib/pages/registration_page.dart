@@ -35,7 +35,6 @@ class _RegistrationPageState extends State<RegistrationPage>
 
   // ── Palette (matches LoginPage) ──────────────
   static const navy = Color(0xFF0D1B3E);
-  static const navyMid = Color(0xFF1A2F5E);
   static const yellow = Color(0xFFFFCC00);
   static const white = Color(0xFFFFFFFF);
   static const grey = Color(0xFFF0F2F8);

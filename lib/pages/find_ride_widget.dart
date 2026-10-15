@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'chat_page.dart';
 import 'ride_active_page.dart';
 
 class FindRideWidget extends StatefulWidget {
