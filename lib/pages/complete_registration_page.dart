@@ -2,11 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'dashboard_page.dart';
 import 'admin_dashboard_page.dart';
-
-// Kept here to avoid circular import with login_page.dart.
-const String _adminEmail = "chaudharideep1106@gmail.com";
+import '../features/main_shell.dart';
+import '../core/utils/role_utils.dart';
 
 class CompleteRegistrationPage extends StatefulWidget {
   const CompleteRegistrationPage({super.key});
@@ -326,16 +324,16 @@ class _CompleteRegistrationPageState
       // ROUTE USER
       // --------------------------------------------------------
 
-      final isAdmin =
-          user.email?.toLowerCase() ==
-              _adminEmail.toLowerCase();
+      final isAdmin = await RoleUtils.isAdmin(user);
+
+      if (!mounted) return;
 
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (_) => isAdmin
               ? const AdminDashboardPage()
-              : DashboardPage(),
+              : const MainShell(),
         ),
       );
     } on FirebaseException catch (e) {

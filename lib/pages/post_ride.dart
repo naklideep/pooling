@@ -506,7 +506,7 @@ class _PostRidePageState extends State<PostRidePage>
         const Icon(Icons.directions_car, color: T.yellow, size: 22),
         const SizedBox(width: 10),
         const Expanded(
-          child: Text("GharTak",
+          child: Text("Pooling",
               style: TextStyle(color: T.txtWhite, fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
         ),
         GestureDetector(

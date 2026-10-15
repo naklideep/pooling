@@ -8,7 +8,7 @@ void main() {
   testWidgets('App loads and shows LoginPage', (WidgetTester tester) async
   {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(GharTakApp());
+    await tester.pumpWidget(const PoolingApp());
 
     // Verify that the LoginPage widget is present.
     expect(find.byType(LoginPage), findsOneWidget);

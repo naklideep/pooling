@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -6,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'live_tracking_service.dart';
+import 'rating_dialog.dart';
 
 class LiveRideTrackingPage extends StatefulWidget {
   final String rideId;
@@ -56,7 +58,7 @@ class _LiveRideTrackingPageState extends State<LiveRideTrackingPage> {
           .get();
 
       if (doc.exists) {
-        final data = doc.data() as Map<String, dynamic>?;
+        final data = doc.data();
         if (data != null && data['isTracking'] == true) {
           setState(() => _isTracking = true);
         }
@@ -232,9 +234,24 @@ class _LiveRideTrackingPageState extends State<LiveRideTrackingPage> {
 
         _showSuccess("✅ Ride successfully completed by both parties!");
 
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) Navigator.pop(context);
-        });
+        final otherUserId = isPoster
+            ? (updated['acceptedBy'] ?? (updated['acceptedByList'] as List?)?.first)
+            : updated['riderId'];
+        final otherUserName = isPoster
+            ? (updated['acceptedByName'] ?? 'Your Rider')
+            : (updated['postedByName'] ?? 'Your Driver');
+
+        if (otherUserId != null && mounted) {
+          await showRatingDialog(
+            context: context,
+            ratedUserId: otherUserId.toString(),
+            ratedUserName: otherUserName.toString(),
+            rideId: widget.rideId,
+            currentUserId: currentUser.uid,
+          );
+        }
+
+        if (mounted) Navigator.pop(context);
       } else {
         _showSuccess(
           isPoster
@@ -291,6 +308,43 @@ class _LiveRideTrackingPageState extends State<LiveRideTrackingPage> {
           }
 
           final data = snap.data!.data() as Map<String, dynamic>? ?? {};
+
+          final currentUser = FirebaseAuth.instance.currentUser;
+          final riderId = data['riderId'];
+          final acceptedBy = data['acceptedBy'];
+          final acceptedByList = (data['acceptedByList'] as List?)?.map((e) => e.toString()).toList() ?? [];
+
+          final isParticipant = currentUser != null && (
+            currentUser.uid == riderId ||
+            currentUser.uid == acceptedBy ||
+            acceptedByList.contains(currentUser.uid)
+          );
+
+          if (!isParticipant) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.security, size: 48, color: Colors.amber),
+                    SizedBox(height: 16),
+                    Text(
+                      'Access Restricted',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Live GPS tracking is only accessible to confirmed participants of this ride.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
           final current = data['currentLocation'] as Map<String, dynamic>?;
 
           if (current != null) {
@@ -322,7 +376,7 @@ class _LiveRideTrackingPageState extends State<LiveRideTrackingPage> {
                 children: [
                   TileLayer(
                     urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    userAgentPackageName: 'com.ghartak.app',
+                    userAgentPackageName: 'com.example.pooling',
                   ),
                   if (_routePoints.isNotEmpty)
                     PolylineLayer(
@@ -361,16 +415,26 @@ class _LiveRideTrackingPageState extends State<LiveRideTrackingPage> {
                           point: _driverPos!,
                           width: 50,
                           height: 50,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.blue,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 3),
-                            ),
-                            child: const Icon(
-                              Icons.directions_car,
-                              color: Colors.white,
-                              size: 30,
+                          child: Transform.rotate(
+                            angle: ((current?['heading'] as num?)?.toDouble() ?? 0.0) * (math.pi / 180),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1A2340),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: const Color(0xFFFFCC00), width: 3),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Colors.black26,
+                                    blurRadius: 6,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.navigation_rounded,
+                                color: Color(0xFFFFCC00),
+                                size: 26,
+                              ),
                             ),
                           ),
                         ),

@@ -1102,52 +1102,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
     );
   }
 
-  Widget _sortDropdown<T>({
-    required T value,
-    required IconData icon,
-    required Map<T, String> items,
-    required ValueChanged<T?> onChanged,
-  }) {
-    return Container(
-      padding    : const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-      decoration : BoxDecoration(
-        color      : GharTakColors.navy,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: GharTakColors.yellow, size: 16),
-          const SizedBox(width: 6),
-          DropdownButtonHideUnderline(
-            child: DropdownButton<T>(
-              value        : value,
-              isDense      : true,
-              dropdownColor: GharTakColors.navyDeep,
-              iconSize     : 18,
-              icon: const Icon(Icons.expand_more, color: GharTakColors.yellow),
-              style: const TextStyle(
-                color     : Colors.white,
-                fontSize  : 13,
-                fontWeight: FontWeight.w600,
-              ),
-              onChanged: onChanged,
-              items: items.entries
-                  .map((e) => DropdownMenuItem<T>(
-                value: e.key,
-                child: Text(e.value,
-                    style: const TextStyle(
-                        color    : Colors.white,
-                        fontSize : 13)),
-              ))
-                  .toList(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _sectionCard({required String title, required Widget child}) {
     return Container(
       width      : double.infinity,
@@ -1508,7 +1462,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage>
                   style: TextStyle(color: Colors.black45))
             else
               ...userRides.take(5).map((r) {
-                final rd = r.data() as Map<String, dynamic>;
+                final rd = r.data();
                 return Container(
                   margin: const EdgeInsets.only(bottom: 8),
                   padding: const EdgeInsets.all(12),

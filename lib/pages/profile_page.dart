@@ -27,7 +27,7 @@ class _ProfilePageState extends State<ProfilePage>
       radius: 46,
       backgroundColor: yellow,
       backgroundImage:
-      hasPhoto ? NetworkImage(photoUrl!) : null,
+      hasPhoto ? NetworkImage(photoUrl) : null,
       child: hasPhoto
           ? null
           : Text(
@@ -50,8 +50,6 @@ class _ProfilePageState extends State<ProfilePage>
   static const navy    = Color(0xFF0D1B3E);
   static const yellow  = Color(0xFFFFCC00);
   static const white   = Color(0xFFFFFFFF);
-  static const grey    = Color(0xFFF0F2F8);
-  static const greyBdr = Color(0xFFDDE0EE);
   static const txtDark = Color(0xFF0D1B3E);
   static const txtMed  = Color(0xFF6B7280);
   static const txtHint = Color(0xFF9CA3AF);
@@ -529,7 +527,7 @@ class _ProfilePageState extends State<ProfilePage>
                             fontWeight: FontWeight.w600, letterSpacing: 0.3)),
                     const SizedBox(height: 3),
                     Text(
-                      hasUpi ? savedUpi! : 'Not set — riders can\'t pay you',
+                      hasUpi ? savedUpi : 'Not set — riders can\'t pay you',
                       style: TextStyle(
                           fontSize: 14,
                           color: hasUpi ? txtDark : txtHint,

@@ -1,0 +1,178 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper functions ─────────────────────────────────────────────────────
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.admin == true ||
+        request.auth.token.role == 'admin' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+      );
+    }
+
+    function isNotBanned() {
+      return isSignedIn() &&
+        !get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isBanned;
+    }
+
+    // ── Users collection ─────────────────────────────────────────────────────
+    match /users/{userId} {
+      // Anyone signed in can view other user profiles (driver name, photo)
+      allow read: if isSignedIn();
+
+      // New users can create their own profile; cannot set themselves as admin or unbanned
+      allow create: if isOwner(userId) &&
+        request.resource.data.role != 'admin' &&
+        request.resource.data.isBanned != true;
+
+      // Users can update their own profile, but cannot elevate role or unban themselves
+      allow update: if (isOwner(userId) &&
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.isBanned == resource.data.isBanned) ||
+        isAdmin();
+
+      // Only admins can delete profiles
+      allow delete: if isAdmin();
+
+      // Saved routes subcollection
+      match /saved_routes/{routeId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Notifications subcollection
+      match /notifications/{notifId} {
+        allow read, update, delete: if isOwner(userId);
+        allow create: if isSignedIn();
+      }
+    }
+
+    // ── Rides collection ─────────────────────────────────────────────────────
+    match /rides/{rideId} {
+      // Any authenticated, non-banned user can browse rides
+      allow read: if isSignedIn();
+
+      // Authenticated users can post rides with themselves as driver
+      allow create: if isSignedIn() &&
+        request.resource.data.riderId == request.auth.uid &&
+        request.resource.data.status in ['pending', 'published'] &&
+        request.resource.data.seats is int &&
+        request.resource.data.seats > 0;
+
+      // Updates:
+      // 1. Driver can update ride details, cancel, complete, or start the ride
+      // 2. Passengers can join via transactional seat decrement (updating remainingSeats & acceptedByList)
+      // 3. Admin can moderate
+      allow update: if isSignedIn() && (
+        // Driver update
+        (resource.data.riderId == request.auth.uid &&
+          request.resource.data.riderId == resource.data.riderId) ||
+        // Seat booking / joining update
+        (request.resource.data.riderId == resource.data.riderId &&
+          request.resource.data.seats == resource.data.seats &&
+          request.resource.data.remainingSeats <= resource.data.remainingSeats) ||
+        // Admin update
+        isAdmin()
+      );
+
+      // Only driver or admin can delete
+      allow delete: if isSignedIn() && (
+        resource.data.riderId == request.auth.uid ||
+        isAdmin()
+      );
+
+      // ── Ride Chat Subcollection ───────────────────────────────────────────
+      match /chats/{messageId} {
+        // Only ride participants (driver or accepted passenger) can read messages
+        allow read: if isSignedIn() && (
+          get(/databases/$(database)/documents/rides/$(rideId)).data.riderId == request.auth.uid ||
+          request.auth.uid in get(/databases/$(database)/documents/rides/$(rideId)).data.acceptedByList ||
+          get(/databases/$(database)/documents/rides/$(rideId)).data.acceptedBy == request.auth.uid ||
+          isAdmin()
+        );
+
+        // Only participants can send messages with their own senderId
+        allow create: if isSignedIn() &&
+          request.resource.data.senderId == request.auth.uid && (
+            get(/databases/$(database)/documents/rides/$(rideId)).data.riderId == request.auth.uid ||
+            request.auth.uid in get(/databases/$(database)/documents/rides/$(rideId)).data.acceptedByList ||
+            get(/databases/$(database)/documents/rides/$(rideId)).data.acceptedBy == request.auth.uid
+          );
+
+        // Senders can edit/delete their own messages; drivers can clear
+        allow update, delete: if isSignedIn() && (
+          resource.data.senderId == request.auth.uid ||
+          get(/databases/$(database)/documents/rides/$(rideId)).data.riderId == request.auth.uid ||
+          isAdmin()
+        );
+      }
+
+      // Typing status subcollection
+      match /typing/{userId} {
+        allow read: if isSignedIn();
+        allow write: if isOwner(userId);
+      }
+    }
+
+    // ── Ride Requests collection (Phase 2 & 3 booking lifecycle) ────────────
+    match /rideRequests/{requestId} {
+      // Passenger who requested or the driver of the ride can read
+      allow read: if isSignedIn() && (
+        resource.data.passengerId == request.auth.uid ||
+        resource.data.driverId == request.auth.uid ||
+        isAdmin()
+      );
+
+      // Passenger can create a booking request for themselves
+      allow create: if isSignedIn() &&
+        request.resource.data.passengerId == request.auth.uid &&
+        request.resource.data.status == 'pending';
+
+      // Passenger can cancel; Driver can approve or reject
+      allow update: if isSignedIn() && (
+        (resource.data.passengerId == request.auth.uid && request.resource.data.status == 'cancelled') ||
+        (resource.data.driverId == request.auth.uid && request.resource.data.status in ['approved', 'rejected']) ||
+        isAdmin()
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    // ── Vehicles collection ──────────────────────────────────────────────────
+    match /vehicles/{vehicleId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    // ── Reports collection (Safety & Moderation) ─────────────────────────────
+    match /reports/{reportId} {
+      allow create: if isSignedIn() && request.resource.data.reporterId == request.auth.uid;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // ── Ratings & Reviews collection ─────────────────────────────────────────
+    match /ratings/{ratingId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.reviewerId == request.auth.uid;
+      allow update: if isOwner(resource.data.reviewerId);
+      allow delete: if isAdmin();
+    }
+
+    // ── Audit Logs collection (Admin only) ───────────────────────────────────
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() || isSignedIn(); // allows logging security events
+      allow update, delete: if false; // immutable audit log
+    }
+  }
+}

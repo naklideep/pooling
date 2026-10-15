@@ -1,5 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.riyal1">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- 🌐 Internet & Network Access -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -16,7 +15,7 @@
         android:maxSdkVersion="28" />
 
     <application
-        android:label="NewGharTak"
+        android:label="POOLING"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">

@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:geolocator/geolocator.dart';
-import 'chat_page.dart';
 import 'live_ride_tracking_page.dart';
 import 'ride_active_page.dart';
 
@@ -941,6 +939,16 @@ class _YourRidesPageState extends State<YourRidesPage>
           ),
         ),
       ));
+
+      if (['tracking', 'in_progress'].contains(status)) {
+        buttons.add(_buildActionButton(
+          icon: Icons.map_rounded,
+          label: "Track",
+          color: kNavy,
+          isOutlined: true,
+          onPressed: () => _openTrackingPage(rideData, rideId, isPoster),
+        ));
+      }
     }
 
     if ((isPoster && ['pending', 'accepted', 'tracking'].contains(status)) ||

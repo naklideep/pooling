@@ -1,1 +1,29 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"newridebuddy","appId":"1:648101956292:android:9926fa968f4f8f7a8b5791","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"newridebuddy","configurations":{"android":"1:648101956292:android:9926fa968f4f8f7a8b5791","ios":"1:648101956292:ios:73dcbc1fc0215d668b5791","macos":"1:648101956292:ios:73dcbc1fc0215d668b5791","web":"1:648101956292:web:cdf9b2b6b817c77d8b5791","windows":"1:648101956292:web:76d3e6726b1c704d8b5791"}}}}}}
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "pooling-aa397",
+          "appId": "1:1022071991381:android:b25d21720409480cc7b8dc",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "pooling-aa397",
+          "configurations": {
+            "android": "1:1022071991381:android:b25d21720409480cc7b8dc",
+            "ios": "1:1022071991381:ios:1f02465cc8e9cd59c7b8dc",
+            "macos": "1:1022071991381:ios:1f02465cc8e9cd59c7b8dc",
+            "web": "1:1022071991381:web:0f00740cd26846a6c7b8dc",
+            "windows": "1:1022071991381:web:851d5bc9ecdcfa65c7b8dc"
+          }
+        }
+      }
+    }
+  }
+}

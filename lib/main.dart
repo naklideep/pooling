@@ -5,11 +5,14 @@ import 'firebase_options.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import 'core/theme/app_theme.dart';
 import 'pages/admin_dashboard_page.dart';
+import 'pages/saved_routes_page.dart';
+import 'features/main_shell.dart';
 import 'splash_page.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-FlutterLocalNotificationsPlugin();
+    FlutterLocalNotificationsPlugin();
 
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -26,7 +29,7 @@ void _showLocalNotification(RemoteMessage message) async {
   );
 
   const NotificationDetails notificationDetails =
-  NotificationDetails(android: androidDetails);
+      NotificationDetails(android: androidDetails);
 
   await flutterLocalNotificationsPlugin.show(
     DateTime.now().millisecondsSinceEpoch ~/ 1000,
@@ -43,7 +46,7 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // ✅ Firestore performance setting
+  // Enable Firestore offline persistence.
   FirebaseFirestore.instance.settings = const Settings(
     persistenceEnabled: true,
   );
@@ -52,15 +55,15 @@ void main() async {
 
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  runApp(const GharTakApp());
+  runApp(const PoolingApp());
 }
 
 Future<void> _initializeNotifications() async {
   const AndroidInitializationSettings androidInitSettings =
-  AndroidInitializationSettings('@mipmap/ic_launcher');
+      AndroidInitializationSettings('@mipmap/ic_launcher');
 
   const InitializationSettings initSettings =
-  InitializationSettings(android: androidInitSettings);
+      InitializationSettings(android: androidInitSettings);
 
   await flutterLocalNotificationsPlugin.initialize(initSettings);
 
@@ -72,21 +75,31 @@ Future<void> _initializeNotifications() async {
   });
 }
 
-class GharTakApp extends StatelessWidget {
-  const GharTakApp({super.key});
+/// Root application widget for Pooling.
+class PoolingApp extends StatelessWidget {
+  const PoolingApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'GharTak',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        useMaterial3: true,
-      ),
+      title: 'Pooling',
+      theme: AppTheme.light,
       home: const SplashPage(),
       routes: {
         '/admin': (_) => const AdminDashboardPage(),
+        '/main': (_) => const MainShell(),
+      },
+      onGenerateRoute: (settings) {
+        // Named routes that require arguments.
+        if (settings.name == '/saved-routes') {
+          final args = settings.arguments as Map<String, dynamic>?;
+          final uid = args?['userId'] as String? ?? '';
+          return MaterialPageRoute(
+            builder: (_) => SavedRoutesPage(userId: uid),
+          );
+        }
+        return null;
       },
     );
   }
