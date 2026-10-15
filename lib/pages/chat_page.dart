@@ -11,7 +11,8 @@ class ChatPage extends StatefulWidget {
   State<ChatPage> createState() => _ChatPageState();
 }
 
-class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin {
+class _ChatPageState extends State<ChatPage>
+    with SingleTickerProviderStateMixin {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -43,16 +44,30 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
 
   Future<void> _loadUserData() async {
     try {
-      final rideDoc = await _firestore.collection('rides').doc(widget.rideId).get();
+      final rideDoc = await _firestore
+          .collection('rides')
+          .doc(widget.rideId)
+          .get();
       if (rideDoc.exists) {
-        final participants = rideDoc.data()?['participants'] as List<dynamic>? ?? [];
-        for (var userId in participants) {
-          final userDoc = await _firestore.collection('users').doc(userId).get();
+        final data = rideDoc.data();
+        final participantSet = <String>{};
+        if (data?['riderId'] != null)
+          participantSet.add(data!['riderId'] as String);
+        if (data?['acceptedBy'] != null)
+          participantSet.add(data!['acceptedBy'] as String);
+        if (data?['acceptedByList'] is List) {
+          participantSet.addAll(List<String>.from(data!['acceptedByList']));
+        }
+        for (var userId in participantSet) {
+          final userDoc = await _firestore
+              .collection('users')
+              .doc(userId)
+              .get();
           if (userDoc.exists) {
             _userCache[userId] = userDoc.data();
           }
         }
-        setState(() {});
+        if (mounted) setState(() {});
       }
     } catch (e) {
       debugPrint('Error loading user data: $e');
@@ -66,15 +81,18 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
         .collection('typing')
         .snapshots()
         .listen((snapshot) {
-      final typingUsersList = snapshot.docs
-          .where((doc) => doc.id != _auth.currentUser!.uid && doc['typing'] == true)
-          .map((doc) => doc.id)
-          .toList();
-      setState(() {
-        _typingUsers = typingUsersList;
-        _isTyping = typingUsersList.isNotEmpty;
-      });
-    });
+          final typingUsersList = snapshot.docs
+              .where(
+                (doc) =>
+                    doc.id != _auth.currentUser!.uid && doc['typing'] == true,
+              )
+              .map((doc) => doc.id)
+              .toList();
+          setState(() {
+            _typingUsers = typingUsersList;
+            _isTyping = typingUsersList.isNotEmpty;
+          });
+        });
   }
 
   void _updateTyping(bool typing) {
@@ -84,9 +102,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
         .collection('typing')
         .doc(_auth.currentUser!.uid)
         .set({
-      'typing': typing,
-      'timestamp': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+          'typing': typing,
+          'timestamp': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
   }
 
   Future<void> sendMessage() async {
@@ -101,13 +119,13 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
           .doc(widget.rideId)
           .collection('chats')
           .add({
-        'senderId': _auth.currentUser!.uid,
-        'senderName': _auth.currentUser!.displayName ?? 'Unknown',
-        'message': message,
-        'timestamp': FieldValue.serverTimestamp(),
-        'readBy': [_auth.currentUser!.uid],
-        'edited': false,
-      });
+            'senderId': _auth.currentUser!.uid,
+            'senderName': _auth.currentUser!.displayName ?? 'Unknown',
+            'message': message,
+            'timestamp': FieldValue.serverTimestamp(),
+            'readBy': [_auth.currentUser!.uid],
+            'edited': false,
+          });
 
       _messageController.clear();
       _updateTyping(false);
@@ -148,7 +166,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
           children: [
             const Icon(Icons.error_outline, color: Colors.white),
             const SizedBox(width: 12),
-            Expanded(child: Text(message, style: const TextStyle(fontSize: 15))),
+            Expanded(
+              child: Text(message, style: const TextStyle(fontSize: 15)),
+            ),
           ],
         ),
         backgroundColor: const Color(0xFFE53935),
@@ -167,7 +187,8 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
     final diff = now.difference(date);
 
     if (diff.inDays == 0) return DateFormat('hh:mm a').format(date);
-    if (diff.inDays == 1) return 'Yesterday ${DateFormat('hh:mm a').format(date)}';
+    if (diff.inDays == 1)
+      return 'Yesterday ${DateFormat('hh:mm a').format(date)}';
     if (diff.inDays < 7) return DateFormat('EEE hh:mm a').format(date);
     return DateFormat('MMM d, hh:mm a').format(date);
   }
@@ -189,7 +210,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
         margin: const EdgeInsets.symmetric(vertical: 3, horizontal: 16),
         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
         child: Column(
-          crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          crossAxisAlignment: isMe
+              ? CrossAxisAlignment.end
+              : CrossAxisAlignment.start,
           children: [
             if (!isMe)
               Padding(
@@ -225,7 +248,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                 ],
               ),
               child: Column(
-                crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                crossAxisAlignment: isMe
+                    ? CrossAxisAlignment.end
+                    : CrossAxisAlignment.start,
                 children: [
                   Text(
                     _filterProfanity(msg['message']),
@@ -253,7 +278,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                         Icon(
                           readCount > 1 ? Icons.done_all : Icons.done,
                           size: 13,
-                          color: readCount > 1 ? kYellow : Colors.white.withOpacity(0.5),
+                          color: readCount > 1
+                              ? kYellow
+                              : Colors.white.withOpacity(0.5),
                         ),
                       ],
                       if (msg['edited'] == true) ...[
@@ -313,12 +340,18 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                     color: const Color(0xFFFFEBEE),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                  child: const Icon(
+                    Icons.delete_outline,
+                    color: Colors.redAccent,
+                  ),
                 ),
                 title: const Text(
                   'Delete Message',
                   style: TextStyle(
-                      color: kNavy, fontSize: 16, fontWeight: FontWeight.w500),
+                    color: kNavy,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
                 onTap: () {
                   Navigator.pop(context);
@@ -374,12 +407,18 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                     color: const Color(0xFFFFEBEE),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.delete_sweep, color: Colors.redAccent),
+                  child: const Icon(
+                    Icons.delete_sweep,
+                    color: Colors.redAccent,
+                  ),
                 ),
                 title: const Text(
                   'Clear Chat',
                   style: TextStyle(
-                      color: kNavy, fontSize: 16, fontWeight: FontWeight.w500),
+                    color: kNavy,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
                 subtitle: Text(
                   'Delete all messages',
@@ -412,25 +451,38 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                 color: const Color(0xFFFFEBEE),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.warning_amber_rounded,
-                  color: Colors.redAccent, size: 22),
+              child: const Icon(
+                Icons.warning_amber_rounded,
+                color: Colors.redAccent,
+                size: 22,
+              ),
             ),
             const SizedBox(width: 12),
             const Text(
               "Clear Chat?",
               style: TextStyle(
-                  color: kNavy, fontWeight: FontWeight.bold, fontSize: 18),
+                color: kNavy,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
             ),
           ],
         ),
         content: Text(
           "Are you sure you want to delete all messages? This cannot be undone.",
-          style: TextStyle(color: Colors.grey.shade600, fontSize: 14, height: 1.5),
+          style: TextStyle(
+            color: Colors.grey.shade600,
+            fontSize: 14,
+            height: 1.5,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text("Cancel", style: TextStyle(color: Colors.grey.shade500)),
+            child: Text(
+              "Cancel",
+              style: TextStyle(color: Colors.grey.shade500),
+            ),
           ),
           ElevatedButton(
             onPressed: () {
@@ -441,7 +493,8 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
               backgroundColor: Colors.redAccent,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
             child: const Text("Clear"),
           ),
@@ -474,7 +527,9 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
           ),
           backgroundColor: const Color(0xFF43A047),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           margin: const EdgeInsets.all(16),
         ),
       );
@@ -561,10 +616,16 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.error_outline, size: 48, color: Colors.grey.shade400),
+                        Icon(
+                          Icons.error_outline,
+                          size: 48,
+                          color: Colors.grey.shade400,
+                        ),
                         const SizedBox(height: 12),
-                        Text('Something went wrong',
-                            style: TextStyle(color: Colors.grey.shade500)),
+                        Text(
+                          'Something went wrong',
+                          style: TextStyle(color: Colors.grey.shade500),
+                        ),
                       ],
                     ),
                   );
@@ -572,7 +633,8 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
 
                 if (!snapshot.hasData) {
                   return const Center(
-                      child: CircularProgressIndicator(color: kNavy));
+                    child: CircularProgressIndicator(color: kNavy),
+                  );
                 }
 
                 final messages = snapshot.data!.docs;
@@ -594,22 +656,28 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                               ),
                             ],
                           ),
-                          child: const Icon(Icons.chat_bubble_outline,
-                              size: 48, color: kNavy),
+                          child: const Icon(
+                            Icons.chat_bubble_outline,
+                            size: 48,
+                            color: kNavy,
+                          ),
                         ),
                         const SizedBox(height: 20),
                         const Text(
                           'No messages yet',
                           style: TextStyle(
-                              color: kNavy,
-                              fontSize: 17,
-                              fontWeight: FontWeight.w600),
+                            color: kNavy,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                         const SizedBox(height: 6),
                         Text(
                           'Start the conversation!',
                           style: TextStyle(
-                              color: Colors.grey.shade500, fontSize: 14),
+                            color: Colors.grey.shade500,
+                            fontSize: 14,
+                          ),
                         ),
                       ],
                     ),
@@ -627,9 +695,13 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                     final msg = messages[index - 1];
                     final msgData = msg.data()! as Map<String, dynamic>;
 
-                    if (!(msgData['readBy'] as List).contains(_auth.currentUser!.uid)) {
+                    if (!(msgData['readBy'] as List).contains(
+                      _auth.currentUser!.uid,
+                    )) {
                       msg.reference.update({
-                        'readBy': FieldValue.arrayUnion([_auth.currentUser!.uid])
+                        'readBy': FieldValue.arrayUnion([
+                          _auth.currentUser!.uid,
+                        ]),
                       });
                     }
 
@@ -665,7 +737,11 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                 color: Colors.white.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+              child: const Icon(
+                Icons.arrow_back,
+                color: Colors.white,
+                size: 20,
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -756,11 +832,12 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                   style: const TextStyle(color: kNavy, fontSize: 15),
                   decoration: InputDecoration(
                     hintText: 'Type a message...',
-                    hintStyle:
-                    TextStyle(color: Colors.grey.shade400, fontSize: 15),
+                    hintStyle: TextStyle(
+                      color: Colors.grey.shade400,
+                      fontSize: 15,
+                    ),
                     border: InputBorder.none,
-                    contentPadding:
-                    const EdgeInsets.symmetric(vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                   onChanged: (text) => _updateTyping(text.isNotEmpty),
                   onSubmitted: (_) => sendMessage(),
@@ -778,11 +855,13 @@ class _ChatPageState extends State<ChatPage> with SingleTickerProviderStateMixin
                 ),
                 child: _isLoading
                     ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                      color: kNavy, strokeWidth: 2),
-                )
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          color: kNavy,
+                          strokeWidth: 2,
+                        ),
+                      )
                     : const Icon(Icons.send_rounded, color: kNavy, size: 20),
               ),
             ),

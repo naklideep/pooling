@@ -6,6 +6,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/pooling_header.dart';
 import '../../pages/login_page.dart';
+import '../../pages/saved_routes_page.dart';
+import '../vehicles/vehicles_page.dart';
+import '../safety/safety_sheet.dart';
+import '../main_shell.dart';
 
 /// Profile tab — shows user information, stats, preferences and account actions.
 ///
@@ -285,17 +289,20 @@ class _ProfileTabState extends State<ProfileTab> {
           icon: Icons.bookmark_border_rounded,
           label: 'Saved Routes',
           onTap: () {
-            // Navigate to existing SavedRoutesPage
-            Navigator.of(context).pushNamed('/saved-routes');
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => SavedRoutesPage(userId: widget.userId),
+              ),
+            );
           },
         ),
         _ActionTile(
           icon: Icons.directions_car_outlined,
-          label: 'Vehicle Info',
+          label: 'My Vehicles',
           onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Vehicle management coming in Phase 5.'),
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => VehiclesPage(userId: widget.userId),
               ),
             );
           },
@@ -304,7 +311,14 @@ class _ProfileTabState extends State<ProfileTab> {
           icon: Icons.history_rounded,
           label: 'Ride History',
           onTap: () {
-            // Switch to My Trips tab
+            MainShell.switchToTab(context, 3);
+          },
+        ),
+        _ActionTile(
+          icon: Icons.shield_outlined,
+          label: 'Safety & Support Report',
+          onTap: () {
+            SafetySheet.show(context);
           },
         ),
         const SizedBox(height: 24),
