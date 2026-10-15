@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'pages/login_page.dart';
-import 'pages/dashboard_page.dart';
+import 'features/main_shell.dart';
 import 'pages/admin_dashboard_page.dart';
 import 'pages/onboarding_page.dart';
 
+// NOTE: Admin is currently routed by hardcoded email — see audit for Custom Claims upgrade plan.
 const String adminEmail = "chaudharideep1106@gmail.com";
 
 class SplashPage extends StatefulWidget {
@@ -19,7 +20,6 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
 
   // ── Palette ──────────────────────────────────
   static const navy    = Color(0xFF0D1B3E);
-  static const navyMid = Color(0xFF1A2F5E);
   static const yellow  = Color(0xFFFFCC00);
   static const white   = Color(0xFFFFFFFF);
 
@@ -162,7 +162,7 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
       final isAdmin = user.email == adminEmail ||
           (doc.exists && doc.data()?['role'] == 'admin');
 
-      _goTo(isAdmin ? const AdminDashboardPage() : DashboardPage());
+      _goTo(isAdmin ? const AdminDashboardPage() : const MainShell());
 
     } catch (_) {
       await FirebaseAuth.instance.signOut();
@@ -425,7 +425,7 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
             child: const Row(mainAxisSize: MainAxisSize.min, children: [
               Icon(Icons.bolt_rounded, color: navy, size: 12),
               SizedBox(width: 4),
-              Text("CAMPUS RIDES", style: TextStyle(
+              Text("CARPOOL TOGETHER", style: TextStyle(
                   color: navy, fontSize: 9,
                   fontWeight: FontWeight.w900, letterSpacing: 1.6)),
             ]),
@@ -440,7 +440,7 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
         child: FadeTransition(
           opacity: _line2Fade,
           child: const Text(
-            "GharTak",
+            "Pooling",
             style: TextStyle(
               color: white, fontSize: 52,
               fontWeight: FontWeight.w900,
@@ -457,9 +457,9 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
         child: FadeTransition(
           opacity: _line3Fade,
           child: Text(
-            "Campus rides, made simple",
+            "Better rides, together.",
             style: TextStyle(
-              color: white.withOpacity(0.4),
+              color: white.withValues(alpha: 0.4),
               fontSize: 14, fontWeight: FontWeight.w400, letterSpacing: 0.2,
             ),
           ),

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'dashboard_page.dart';
+import '../features/main_shell.dart';
 import 'registration_page.dart';
 import 'admin_dashboard_page.dart';
 import 'complete_registration_page.dart';
@@ -531,7 +531,7 @@ class _LoginPageState extends State<LoginPage>
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => DashboardPage(),
+          builder: (_) => const MainShell(),
         ),
       );
 
