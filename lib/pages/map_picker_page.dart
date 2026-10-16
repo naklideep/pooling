@@ -4,7 +4,9 @@ import 'package:latlong2/latlong.dart';
 import 'package:geocoding/geocoding.dart';
 
 class MapPickerPage extends StatefulWidget {
-  const MapPickerPage({super.key});
+  final String? title;
+
+  const MapPickerPage({super.key, this.title});
 
   @override
   State<MapPickerPage> createState() => _MapPickerPageState();
@@ -45,7 +47,7 @@ class _MapPickerPageState extends State<MapPickerPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Select Destination")),
+      appBar: AppBar(title: Text(widget.title ?? "Select Destination")),
       body: Stack(
         children: [
           FlutterMap(

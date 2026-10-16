@@ -70,16 +70,17 @@ service cloud.firestore {
 
       // Updates:
       // 1. Driver can update ride details, cancel, complete, or start the ride
-      // 2. Passengers can join via transactional seat decrement (updating remainingSeats & acceptedByList)
+      // 2. Passengers can join or cancel via transactional seat changes (updating remainingSeats & acceptedByList)
       // 3. Admin can moderate
       allow update: if isSignedIn() && (
         // Driver update
         (resource.data.riderId == request.auth.uid &&
           request.resource.data.riderId == resource.data.riderId) ||
-        // Seat booking / joining update
+        // Seat booking / joining / cancellation update
         (request.resource.data.riderId == resource.data.riderId &&
           request.resource.data.seats == resource.data.seats &&
-          request.resource.data.remainingSeats <= resource.data.remainingSeats) ||
+          request.resource.data.remainingSeats >= 0 &&
+          request.resource.data.remainingSeats <= resource.data.seats) ||
         // Admin update
         isAdmin()
       );
@@ -121,6 +122,105 @@ service cloud.firestore {
         allow read: if isSignedIn();
         allow write: if isOwner(userId);
       }
+    }
+
+    // ── Commute Schedules collection (Recurring Commutes) ─────────────────────
+    match /commuteSchedules/{scheduleId} {
+      // Authenticated users can browse schedules (for discovery)
+      allow read: if isSignedIn();
+
+      // Only the publisher can create their own schedule
+      allow create: if isSignedIn() &&
+        request.resource.data.publisherId == request.auth.uid;
+
+      // Publisher can update their schedule; subscribers can increment/decrement subscriber count
+      allow update: if isSignedIn() && (
+        resource.data.publisherId == request.auth.uid ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['subscriberCount']) ||
+        isAdmin()
+      );
+
+      // Only publisher or admin can delete
+      allow delete: if isSignedIn() && (
+        resource.data.publisherId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // ── Subscriptions collection ─────────────────────────────────────────────
+    match /subscriptions/{subscriptionId} {
+      // Subscriber, publisher, or admin can read subscription
+      allow read: if isSignedIn() && (
+        resource.data.subscriberId == request.auth.uid ||
+        resource.data.publisherId == request.auth.uid ||
+        isAdmin()
+      );
+
+      // Subscriber creates their own subscription
+      allow create: if isSignedIn() &&
+        request.resource.data.subscriberId == request.auth.uid;
+
+      // Subscriber can pause/cancel; publisher can manage; admin can moderate
+      allow update: if isSignedIn() && (
+        resource.data.subscriberId == request.auth.uid ||
+        resource.data.publisherId == request.auth.uid ||
+        isAdmin()
+      );
+
+      allow delete: if isSignedIn() && (
+        resource.data.subscriberId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // ── Invitations collection ───────────────────────────────────────────────
+    match /invitations/{invitationId} {
+      // Authenticated users can read invitations (allows code lookup and recipient view)
+      allow read: if isSignedIn();
+
+      // Only publisher can create invitations
+      allow create: if isSignedIn() &&
+        request.resource.data.publisherId == request.auth.uid;
+
+      // Publisher can revoke; recipient can accept or decline
+      allow update: if isSignedIn() && (
+        resource.data.publisherId == request.auth.uid ||
+        resource.data.recipientId == request.auth.uid ||
+        resource.data.recipientId == null ||
+        isAdmin()
+      );
+
+      // Publisher or admin can delete
+      allow delete: if isSignedIn() && (
+        resource.data.publisherId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // ── Bookings collection (Authoritative Seat Reservations) ────────────────
+    match /bookings/{bookingId} {
+      // Passenger, driver, or admin can view booking
+      allow read: if isSignedIn() && (
+        resource.data.passengerId == request.auth.uid ||
+        resource.data.driverId == request.auth.uid ||
+        isAdmin()
+      );
+
+      // Passenger or driver (via approval transaction) can create a booking
+      allow create: if isSignedIn() && (
+        request.resource.data.passengerId == request.auth.uid ||
+        request.resource.data.driverId == request.auth.uid ||
+        isAdmin()
+      );
+
+      // Passenger or driver can cancel/update status
+      allow update: if isSignedIn() && (
+        resource.data.passengerId == request.auth.uid ||
+        resource.data.driverId == request.auth.uid ||
+        isAdmin()
+      );
+
+      allow delete: if isAdmin();
     }
 
     // ── Ride Requests collection (Phase 2 & 3 booking lifecycle) ────────────

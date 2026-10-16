@@ -6,6 +6,11 @@ import '../../core/widgets/pooling_header.dart';
 import '../../core/widgets/ride_card.dart';
 import '../../core/widgets/loading_states.dart';
 import '../main_shell.dart';
+import '../notifications/notification_center_page.dart';
+import '../invitations/invitations_page.dart';
+import '../commute/discover_publishers_page.dart';
+import '../commute/my_subscriptions_page.dart';
+import '../commute/my_schedules_page.dart';
 
 /// Home tab — entry point of the main experience.
 ///
@@ -81,7 +86,12 @@ class _HomeTabState extends State<HomeTab> {
     return PoolingHeader(
       trailing: GestureDetector(
         onTap: () {
-          /* open notifications */
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => NotificationCenterPage(userId: widget.userId),
+            ),
+          );
         },
         child: Stack(
           children: [
@@ -174,31 +184,113 @@ class _HomeTabState extends State<HomeTab> {
 
   Widget _buildQuickActions(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+      child: Column(
         children: [
-          Expanded(
-            child: _QuickActionCard(
-              icon: Icons.search_rounded,
-              label: 'Find a Ride',
-              subtitle: 'Browse available rides',
-              color: AppColors.navy,
-              onTap: () {
-                MainShell.switchToTab(context, 1);
-              },
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: _QuickActionCard(
+                  icon: Icons.search_rounded,
+                  label: 'Find a Ride',
+                  subtitle: 'Browse single rides',
+                  color: AppColors.navy,
+                  onTap: () {
+                    MainShell.switchToTab(context, 1);
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _QuickActionCard(
+                  icon: Icons.add_road_rounded,
+                  label: 'Offer a Ride',
+                  subtitle: 'Share your journey',
+                  color: AppColors.yellow,
+                  onTap: () {
+                    MainShell.switchToTab(context, 2);
+                  },
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _QuickActionCard(
-              icon: Icons.add_road_rounded,
-              label: 'Offer a Ride',
-              subtitle: 'Share your journey',
-              color: AppColors.yellow,
-              onTap: () {
-                MainShell.switchToTab(context, 2);
-              },
-            ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _QuickActionCard(
+                  icon: Icons.repeat_rounded,
+                  label: 'My Commutes',
+                  subtitle: 'Publisher schedules',
+                  color: AppColors.navy,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => MySchedulesPage(userId: widget.userId),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _QuickActionCard(
+                  icon: Icons.mark_email_unread_outlined,
+                  label: 'Ride Invites',
+                  subtitle: 'Sent & received',
+                  color: AppColors.yellowDark,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => InvitationsPage(userId: widget.userId),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _QuickActionCard(
+                  icon: Icons.explore_outlined,
+                  label: 'Discover Routes',
+                  subtitle: 'Find recurring publishers',
+                  color: const Color(0xFF2E7D32),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            DiscoverPublishersPage(userId: widget.userId),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _QuickActionCard(
+                  icon: Icons.subscriptions_outlined,
+                  label: 'Subscriptions',
+                  subtitle: 'Your recurring routes',
+                  color: const Color(0xFF5C6BC0),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            MySubscriptionsPage(userId: widget.userId),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         ],
       ),

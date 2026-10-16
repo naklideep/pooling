@@ -4,7 +4,9 @@ import 'package:latlong2/latlong.dart';
 import 'package:geocoding/geocoding.dart';
 
 class EnhancedMapPicker extends StatefulWidget {
-  const EnhancedMapPicker({super.key});
+  final String? title;
+
+  const EnhancedMapPicker({super.key, this.title});
 
   @override
   State<EnhancedMapPicker> createState() => _EnhancedMapPickerState();
@@ -66,6 +68,8 @@ class _EnhancedMapPickerState extends State<EnhancedMapPicker> {
       Navigator.pop(context, {
         'address': _selectedAddress,
         'latLng': _selectedLocation,
+        'lat': _selectedLocation!.latitude,
+        'lng': _selectedLocation!.longitude,
       });
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -81,7 +85,7 @@ class _EnhancedMapPickerState extends State<EnhancedMapPicker> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Pick Destination"),
+        title: Text(widget.title ?? "Pick Destination"),
         centerTitle: true,
         actions: [
           IconButton(
