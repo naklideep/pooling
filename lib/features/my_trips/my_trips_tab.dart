@@ -239,6 +239,23 @@ class _RideList extends StatelessWidget {
           }).toList();
         }
 
+        // In Upcoming/Offered, deduplicate recurring commute occurrences so only
+        // the next upcoming occurrence is shown per schedule
+        if (statuses != null && statuses!.contains('published')) {
+          final seenSchedules = <String>{};
+          final deduped = <QueryDocumentSnapshot>[];
+          for (final d in docs) {
+            final data = d.data() as Map<String, dynamic>;
+            final scheduleId = data['scheduleId'] as String?;
+            if (scheduleId != null && scheduleId.isNotEmpty) {
+              if (seenSchedules.contains(scheduleId)) continue;
+              seenSchedules.add(scheduleId);
+            }
+            deduped.add(d);
+          }
+          docs = deduped;
+        }
+
         if (docs.isEmpty) {
           return PoolingEmptyState(
             icon: Icons.directions_car_outlined,

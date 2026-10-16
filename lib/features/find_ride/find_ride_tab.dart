@@ -114,7 +114,7 @@ class _FindRideTabState extends State<FindRideTab> {
           );
         }
 
-        final docs = (snapshot.data?.docs ?? []).where((doc) {
+        final filteredDocs = (snapshot.data?.docs ?? []).where((doc) {
           final data = doc.data() as Map<String, dynamic>;
           // Exclude own rides
           if (data['riderId'] == widget.userId) return false;
@@ -129,6 +129,19 @@ class _FindRideTabState extends State<FindRideTab> {
               from.contains(_searchQ) ||
               name.contains(_searchQ);
         }).toList();
+
+        // Deduplicate recurring commute occurrences so only one card per schedule is shown
+        final seenSchedules = <String>{};
+        final docs = <QueryDocumentSnapshot>[];
+        for (final doc in filteredDocs) {
+          final data = doc.data() as Map<String, dynamic>;
+          final scheduleId = data['scheduleId'] as String?;
+          if (scheduleId != null && scheduleId.isNotEmpty) {
+            if (seenSchedules.contains(scheduleId)) continue;
+            seenSchedules.add(scheduleId);
+          }
+          docs.add(doc);
+        }
 
         if (docs.isEmpty) {
           return PoolingEmptyState(

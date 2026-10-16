@@ -361,7 +361,20 @@ class _HomeTabState extends State<HomeTab> {
               )
               .toList();
 
-          if (filtered.isEmpty) {
+          // Deduplicate recurring commute occurrences so only one card per schedule shows
+          final seenSchedules = <String>{};
+          final deduped = <QueryDocumentSnapshot>[];
+          for (final doc in filtered) {
+            final data = doc.data() as Map<String, dynamic>;
+            final scheduleId = data['scheduleId'] as String?;
+            if (scheduleId != null && scheduleId.isNotEmpty) {
+              if (seenSchedules.contains(scheduleId)) continue;
+              seenSchedules.add(scheduleId);
+            }
+            deduped.add(doc);
+          }
+
+          if (deduped.isEmpty) {
             return const Padding(
               padding: EdgeInsets.symmetric(horizontal: 20),
               child: _EmptyState(),
@@ -372,10 +385,10 @@ class _HomeTabState extends State<HomeTab> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            itemCount: filtered.length,
+            itemCount: deduped.length,
             separatorBuilder: (_, __) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
-              final doc = filtered[index];
+              final doc = deduped[index];
               final data = doc.data() as Map<String, dynamic>;
               return RideCard(
                 rideId: doc.id,

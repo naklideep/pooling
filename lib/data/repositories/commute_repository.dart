@@ -33,7 +33,7 @@ class CommuteRepository {
       _firestore.collection('commuteSchedules');
   CollectionReference get _ridesRef => _firestore.collection('rides');
 
-  /// Creates a recurring commute schedule and generates upcoming occurrences.
+  /// Creates a recurring commute schedule and generates the next upcoming occurrence.
   Future<CommuteResult> createSchedule(CommuteScheduleModel schedule) async {
     try {
       final docRef = _schedulesRef.doc();
@@ -42,11 +42,11 @@ class CommuteRepository {
       final data = schedule.toMap();
       await docRef.set(data);
 
-      // Generate occurrences for the next 14 days
+      // Generate only the single next upcoming occurrence (rolling schedule)
       await generateOccurrences(
         scheduleId: scheduleId,
         scheduleData: schedule,
-        daysAhead: 14,
+        maxOccurrences: 1,
       );
 
       return CommuteResult.ok(
@@ -62,10 +62,12 @@ class CommuteRepository {
   ///
   /// Uses deterministic doc IDs (`${scheduleId}_${occurrenceDate}`) so
   /// it is completely idempotent and will never overwrite existing bookings.
+  /// Generates only [maxOccurrences] upcoming rides (default: 1) to avoid flooding feeds.
   Future<int> generateOccurrences({
     required String scheduleId,
     required CommuteScheduleModel scheduleData,
-    int daysAhead = 14,
+    int maxOccurrences = 1,
+    int searchWindowDays = 14,
   }) async {
     int createdCount = 0;
     final now = DateTime.now();
@@ -78,7 +80,9 @@ class CommuteRepository {
     final batch = _firestore.batch();
     bool hasBatchedWrites = false;
 
-    for (int i = 0; i < daysAhead; i++) {
+    for (int i = 0; i < searchWindowDays; i++) {
+      if (createdCount >= maxOccurrences) break;
+
       final targetDate = now.add(Duration(days: i));
       final weekday = targetDate.weekday; // 1 = Mon, 7 = Sun
 
@@ -102,7 +106,8 @@ class CommuteRepository {
 
       final occurrenceDoc = await _ridesRef.doc(occurrenceDocId).get();
       if (occurrenceDoc.exists) {
-        // Occurrence already generated; do not mutate existing bookings
+        // Occurrence already exists; count it and stop so we don't spam multiple
+        createdCount++;
         continue;
       }
 
@@ -182,7 +187,7 @@ class CommuteRepository {
       await generateOccurrences(
         scheduleId: scheduleId,
         scheduleData: schedule,
-        daysAhead: 14,
+        maxOccurrences: 1,
       );
 
       return CommuteResult.ok(message: 'Commute schedule resumed.');
@@ -191,13 +196,30 @@ class CommuteRepository {
     }
   }
 
-  /// Ends a recurring commute schedule permanently.
+  /// Ends a recurring commute schedule permanently and cleans up unbooked occurrences.
   Future<CommuteResult> endSchedule(String scheduleId) async {
     try {
-      await _schedulesRef.doc(scheduleId).update({
+      // Find unbooked future occurrences and cancel them
+      final futureOccurrences = await _ridesRef
+          .where('scheduleId', isEqualTo: scheduleId)
+          .where('status', isEqualTo: 'published')
+          .get();
+
+      final batch = _firestore.batch();
+      for (final doc in futureOccurrences.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final accepted = List.from(data['acceptedByList'] ?? []);
+        if (accepted.isEmpty) {
+          batch.update(doc.reference, {'status': 'cancelled'});
+        }
+      }
+
+      batch.update(_schedulesRef.doc(scheduleId), {
         'status': CommuteStatus.ended.toDbString(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
+
+      await batch.commit();
       return CommuteResult.ok(message: 'Commute schedule ended.');
     } catch (e) {
       return CommuteResult.fail('Failed to end schedule: $e');
