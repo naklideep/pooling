@@ -4,6 +4,8 @@ import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/repositories/booking_repository.dart';
+import '../../features/bookings/passenger_list_sheet.dart';
+import '../../features/invitations/send_invitation_sheet.dart';
 
 /// Compact/full ride list card used in Home and Find Ride tabs.
 ///
@@ -487,21 +489,69 @@ class _RideDetailSheet extends StatelessWidget {
                       ),
                     )
                   else if (isOwn)
-                    Container(
-                      alignment: Alignment.center,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      decoration: BoxDecoration(
-                        color: AppColors.yellow.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Text(
-                        'This is your own ride',
-                        style: TextStyle(
-                          color: AppColors.navy,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.navy,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                            ),
+                            icon: const Icon(Icons.people_alt_outlined, size: 18),
+                            label: const Text(
+                              'Passengers & PIN',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                            ),
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              showModalBottomSheet<void>(
+                                context: context,
+                                isScrollControlled: true,
+                                backgroundColor: Colors.transparent,
+                                builder: (_) => PassengerListSheet(
+                                  rideId: rideId,
+                                  driverId: currentUserId,
+                                  rideCode: (rideData['rideCode'] ?? '----').toString(),
+                                ),
+                              );
+                            },
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.navy,
+                              side: const BorderSide(color: AppColors.navy),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                            ),
+                            icon: const Icon(Icons.person_add_alt_1_outlined, size: 18),
+                            label: const Text(
+                              'Invite Riders',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                            ),
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              showModalBottomSheet<void>(
+                                context: context,
+                                isScrollControlled: true,
+                                backgroundColor: Colors.transparent,
+                                builder: (_) => SendInvitationSheet(
+                                  publisherId: currentUserId,
+                                  initialRideId: rideId,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
                     )
                   else
                     Container(

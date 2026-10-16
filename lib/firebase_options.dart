@@ -52,7 +52,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyAZCc5JHi_-jGSfXNa37iqll6Aah7H7HAg',
-    appId: '1:1022071991381:android:b25d21720409480cc7b8dc',
+    appId: '1:1022071991381:android:13477763ba9446f6c7b8dc',
     messagingSenderId: '1022071991381',
     projectId: 'pooling-aa397',
     storageBucket: 'pooling-aa397.firebasestorage.app',

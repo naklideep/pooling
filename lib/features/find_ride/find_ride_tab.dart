@@ -118,6 +118,9 @@ class _FindRideTabState extends State<FindRideTab> {
           final data = doc.data() as Map<String, dynamic>;
           // Exclude own rides
           if (data['riderId'] == widget.userId) return false;
+          // Exclude invite-only rides from open public search
+          final vis = data['visibility'] as String?;
+          if (vis == 'invite_only') return false;
           if (_searchQ.isEmpty) return true;
           final to = (data['to'] ?? '').toString().toLowerCase();
           final from = (data['from'] ?? '').toString().toLowerCase();

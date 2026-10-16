@@ -12,6 +12,7 @@ class AppColors {
   static const Color navyDeep = Color(0xFF0D1726);
   static const Color navyMid = Color(0xFF1A2F5E);
   static const Color yellow = Color(0xFFFFCC00);
+  static const Color yellowDark = Color(0xFFD97706);
   static const Color yellowDim = Color(0x33FFCC00);
 
   // ── Backgrounds ───────────────────────────────────────────────────────────

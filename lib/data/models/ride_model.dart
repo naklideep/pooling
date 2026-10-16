@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'commute_schedule_model.dart';
 
 /// Ride lifecycle status enum.
 enum RideStatus {
@@ -97,6 +98,14 @@ class RideModel {
   final String? rideCode;
   final DateTime? createdAt;
 
+  // Hybrid & recurring commute extensions
+  final String? scheduleId;
+  final String? occurrenceDate; // "YYYY-MM-DD"
+  final RideVisibility visibility;
+  final List<RouteWaypoint> waypoints;
+  final String? notes;
+  final double? maxDetourKm;
+
   RideModel({
     required this.id,
     required this.riderId,
@@ -122,12 +131,20 @@ class RideModel {
     this.acceptedByList = const [],
     this.rideCode,
     this.createdAt,
+    this.scheduleId,
+    this.occurrenceDate,
+    this.visibility = RideVisibility.publicVisibility,
+    this.waypoints = const [],
+    this.notes,
+    this.maxDetourKm,
   });
 
   bool get isFull => remainingSeats <= 0;
   bool get canBook =>
       !isFull &&
       (status == RideStatus.pending || status == RideStatus.published);
+
+  bool get isRecurringOccurrence => scheduleId != null;
 
   /// Validates ride creation inputs.
   static String? validateInputs({
@@ -164,6 +181,12 @@ class RideModel {
       return null;
     }
 
+    final rawWps = d['waypoints'] as List<dynamic>? ?? [];
+    final waypointsList = rawWps
+        .whereType<Map<String, dynamic>>()
+        .map((m) => RouteWaypoint.fromMap(m))
+        .toList();
+
     return RideModel(
       id: doc.id,
       riderId: d['riderId'] ?? '',
@@ -192,6 +215,12 @@ class RideModel {
       acceptedByList: List<String>.from(d['acceptedByList'] ?? []),
       rideCode: d['rideCode'],
       createdAt: parseDate(d['timestamp']),
+      scheduleId: d['scheduleId'],
+      occurrenceDate: d['occurrenceDate'],
+      visibility: RideVisibility.fromString(d['visibility']),
+      waypoints: waypointsList,
+      notes: d['notes'],
+      maxDetourKm: (d['maxDetourKm'] as num?)?.toDouble(),
     );
   }
 
@@ -219,6 +248,13 @@ class RideModel {
       if (acceptedBy != null) 'acceptedBy': acceptedBy,
       'acceptedByList': acceptedByList,
       if (rideCode != null) 'rideCode': rideCode,
+      if (scheduleId != null) 'scheduleId': scheduleId,
+      if (occurrenceDate != null) 'occurrenceDate': occurrenceDate,
+      'visibility': visibility.toDbString(),
+      if (waypoints.isNotEmpty)
+        'waypoints': waypoints.map((w) => w.toMap()).toList(),
+      if (notes != null) 'notes': notes,
+      if (maxDetourKm != null) 'maxDetourKm': maxDetourKm,
       'timestamp': FieldValue.serverTimestamp(),
     };
   }

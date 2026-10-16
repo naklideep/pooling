@@ -258,117 +258,100 @@ class _LoginPageState extends State<LoginPage>
   // ============================================================
 
   Future<void> _loginWithGoogle() async {
-    setState(() {
-      _loading = true;
-    });
+    if (_loading) return;
+
+    setState(() => _loading = true);
 
     try {
       debugPrint("========== GOOGLE LOGIN START ==========");
 
-      final GoogleSignIn googleSignIn =
-          GoogleSignIn.instance;
+      final googleSignIn = GoogleSignIn.instance;
+
+      // Web OAuth client ID from android/app/google-services.json (client_type: 3)
+      const webClientId =
+          '1022071991381-g8vv1vep41n28e40odo8cvsj7sdro0pk.apps.googleusercontent.com';
 
       debugPrint("1. Initializing Google Sign-In...");
 
-      await googleSignIn.initialize();
+      await googleSignIn.initialize(
+        serverClientId: webClientId,
+      );
 
       debugPrint("2. Opening Google account picker...");
 
-      final GoogleSignInAccount googleUser =
-      await googleSignIn.authenticate();
+      final googleUser = await googleSignIn.authenticate();
 
-      debugPrint(
-        "3. Google account selected: ${googleUser.email}",
+      debugPrint("3. Google account selected: ${googleUser.email}");
+
+      final googleAuth = googleUser.authentication;
+      final idToken = googleAuth.idToken;
+
+      debugPrint("4. Google ID token exists: ${idToken != null}");
+
+      if (idToken == null || idToken.isEmpty) {
+        throw StateError(
+          'Google ID token is missing. Verify the Web OAuth client ID and Firebase Android configuration.',
+        );
+      }
+
+      final credential = GoogleAuthProvider.credential(
+        idToken: idToken,
       );
 
-      final GoogleSignInAuthentication googleAuth =
-          googleUser.authentication;
+      debugPrint("5. Signing into Firebase Auth...");
 
-      debugPrint("4. Got Google authentication");
+      final result = await _auth.signInWithCredential(credential);
+      final user = result.user;
 
-      debugPrint(
-        "ID TOKEN EXISTS: ${googleAuth.idToken != null}",
-      );
-
-      final credential =
-      GoogleAuthProvider.credential(
-        idToken: googleAuth.idToken,
-      );
-
-      debugPrint(
-        "5. Signing into Firebase Auth...",
-      );
-
-      final result =
-      await _auth.signInWithCredential(
-        credential,
-      );
-
-      final user = result.user!;
+      if (user == null) {
+        throw StateError('Firebase returned no authenticated user.');
+      }
 
       debugPrint("6. FIREBASE AUTH SUCCESS");
       debugPrint("UID: ${user.uid}");
       debugPrint("EMAIL: ${user.email}");
 
-      // ========================================================
-      // COMMON ROUTING
-      // ========================================================
-
+      // Preserve existing profile creation, ban checks, admin routing,
+      // and profile-completion routing.
       await _routeUser(user);
-
-    } on GoogleSignInException catch (e) {
-      debugPrint("🔥 GOOGLE SIGN-IN ERROR");
+    } on GoogleSignInException catch (e, st) {
+      debugPrint("GOOGLE SIGN-IN EXCEPTION");
       debugPrint("CODE: ${e.code}");
-      debugPrint(
-        "DESCRIPTION: ${e.description}",
-      );
+      debugPrint("DESCRIPTION: ${e.description}");
+      debugPrint("DETAILS: ${e.details}");
+      debugPrintStack(stackTrace: st);
 
-      _snack(
-        "Google Sign-In: ${e.code}",
-        true,
-      );
+      final description = e.description;
+      final message = (description != null && description.isNotEmpty)
+          ? 'Google Sign-In: $description'
+          : 'Google Sign-In: ${e.code.name}';
 
-    } on FirebaseAuthException catch (e) {
-      debugPrint("🔥 FIREBASE AUTH ERROR");
+      if (mounted) _snack(message, true);
+    } on FirebaseAuthException catch (e, st) {
+      debugPrint("FIREBASE AUTH EXCEPTION");
       debugPrint("CODE: ${e.code}");
       debugPrint("MESSAGE: ${e.message}");
+      debugPrintStack(stackTrace: st);
 
-      _snack(
-        e.message ?? "Google login failed.",
-        true,
-      );
-
-    } on FirebaseException catch (e) {
-      debugPrint("🔥 FIREBASE SERVICE ERROR");
+      if (mounted) {
+        _snack('Firebase login failed: ${e.code}', true);
+      }
+    } on FirebaseException catch (e, st) {
+      debugPrint("FIREBASE SERVICE EXCEPTION");
       debugPrint("PLUGIN: ${e.plugin}");
       debugPrint("CODE: ${e.code}");
       debugPrint("MESSAGE: ${e.message}");
+      debugPrintStack(stackTrace: st);
 
-      _snack(
-        "${e.plugin}: ${e.code}",
-        true,
-      );
+      if (mounted) _snack('${e.plugin}: ${e.code}', true);
+    } catch (e, st) {
+      debugPrint("UNKNOWN GOOGLE LOGIN ERROR: $e");
+      debugPrintStack(stackTrace: st);
 
-    } catch (e, stackTrace) {
-      debugPrint("🔥 UNKNOWN GOOGLE ERROR");
-      debugPrint("$e");
-      debugPrint("$stackTrace");
-
-      _snack(
-        "Google login failed.",
-        true,
-      );
-
+      if (mounted) _snack('Google login failed. Check the debug console.', true);
     } finally {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-        });
-      }
-
-      debugPrint(
-        "========== GOOGLE LOGIN END ==========",
-      );
+      if (mounted) setState(() => _loading = false);
+      debugPrint("========== GOOGLE LOGIN END ==========");
     }
   }
 

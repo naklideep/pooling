@@ -12,7 +12,12 @@
           "package_name": "com.example.pooling"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "1022071991381-g8vv1vep41n28e40odo8cvsj7sdro0pk.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAZCc5JHi_-jGSfXNa37iqll6Aah7H7HAg"
@@ -20,7 +25,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1022071991381-g8vv1vep41n28e40odo8cvsj7sdro0pk.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1022071991381-7p2119jhgv5uguajk5vtqdrlioj2ip78.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.riyal1"
+              }
+            }
+          ]
         }
       }
     },
@@ -31,7 +48,20 @@
           "package_name": "com.naklideep.pooling"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "1022071991381-nuvk8t037cjsbtiqlq8l3kjqtnfkl3q8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.naklideep.pooling",
+            "certificate_hash": "49ae650446b4d45b3154cfec1cac83fb24843448"
+          }
+        },
+        {
+          "client_id": "1022071991381-g8vv1vep41n28e40odo8cvsj7sdro0pk.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAZCc5JHi_-jGSfXNa37iqll6Aah7H7HAg"
@@ -39,7 +69,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1022071991381-g8vv1vep41n28e40odo8cvsj7sdro0pk.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1022071991381-7p2119jhgv5uguajk5vtqdrlioj2ip78.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.riyal1"
+              }
+            }
+          ]
         }
       }
     }

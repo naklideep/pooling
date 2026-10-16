@@ -219,3 +219,6 @@ class PoolingEmptyState extends StatelessWidget {
     );
   }
 }
+
+/// Convenience alias for PoolingEmptyState.
+typedef EmptyStateView = PoolingEmptyState;
